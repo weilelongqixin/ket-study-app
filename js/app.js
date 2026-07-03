@@ -381,9 +381,13 @@ const App = {
       <div class="listening-card">
         <h3>👂 ${item.title}</h3>
         <p class="listening-subtitle">${item.subtitle}</p>
+        <audio id="listening-player-${item.id}" controls preload="auto" style="width:100%; margin:10px 0;">
+          <source src="assets/audio/listening_${item.id}.mp3" type="audio/mpeg">
+          您的浏览器不支持音频播放
+        </audio>
         <div class="listening-controls">
-          <button class="btn-play" onclick="App.playListening('${item.id}')">▶️ 播放听力</button>
-          <button class="btn-play" onclick="App.playListening('${item.id}', true)">▶️ 慢速播放</button>
+          <button class="btn-play" onclick="App.playListening(${item.id})">▶️ 播放听力</button>
+          <button class="btn-play" onclick="App.playListening(${item.id}, true)">▶️ 慢速播放</button>
           <button class="btn-small" onclick="App.stopListening()">⏹️ 停止</button>
         </div>
         <div class="listening-question">
@@ -407,33 +411,34 @@ const App = {
   },
 
   playListening(itemId, slow) {
+    // itemId是数字（从onclick传参不带引号）
     const item = KET_LISTENING.find(l => l.id === itemId);
-    if (!item) return;
+    if (!item) {
+      console.error('找不到听力项:', itemId);
+      return;
+    }
 
     const playBtns = document.querySelectorAll('.btn-play');
     playBtns.forEach(b => { b.textContent = '⏳ 加载中...'; b.disabled = true; });
 
-    const audioEl = document.getElementById('listening-audio');
+    // 使用内嵌在卡片中的audio元素（跟测试页面一样）
+    const audioEl = document.getElementById('listening-player-' + itemId);
     if (!audioEl) {
       this._showListenFallback(item, playBtns, 'Audio element missing');
       return;
     }
 
-    // 只做最小限度的清理（不清src，不调load）
-    try { audioEl.pause(); } catch(e){}
+    // 清理
+    try { audioEl.pause(); audioEl.currentTime = 0; } catch(e){}
     if (this.speechSynthesis) { try { this.speechSynthesis.cancel(); } catch(e){} }
     clearTimeout(this._audioTimeout);
 
-    const mp3Path = 'assets/audio/listening_' + itemId + '.mp3';
-    this._updateDebugInfo('设置src: ' + mp3Path);
-
-    // 跟测试页面完全一致的方式：设src直接play，不调load()
-    audioEl.src = mp3Path;
+    // 设置播放速度
     audioEl.playbackRate = slow ? 0.6 : 0.9;
 
     var self = this;
     audioEl.oncanplay = function() {
-      self._updateDebugInfo('音频已加载，正在播放...');
+      self._updateDebugInfo('音频已加载，可以播放');
     };
     audioEl.onplaying = function() {
       playBtns.forEach(b => { b.textContent = '🔊 正在播放'; b.disabled = false; });
@@ -445,29 +450,29 @@ const App = {
     };
     audioEl.onerror = function(e) {
       console.error('音频加载失败:', e);
-      self._updateDebugInfo('❌加载失败');
-      self._tryFallbackAudio(itemId, slow, item, playBtns, mp3Path);
+      self._updateDebugInfo('❌加载失败，尝试降级方案');
+      self._tryFallbackAudio(itemId, slow, item, playBtns);
     };
 
     audioEl.play().then(function() {
       self._updateDebugInfo('▶️ play()成功！');
     }).catch(function(err) {
       console.error('MP3播放失败:', err);
-      self._updateDebugInfo('❌play失败: ' + err.message);
-      self._tryFallbackAudio(itemId, slow, item, playBtns, mp3Path);
+      self._updateDebugInfo('❌play失败: ' + err.message + '，尝试降级');
+      self._tryFallbackAudio(itemId, slow, item, playBtns);
     });
 
     this._currentAudioItemId = itemId;
   },
 
-  _tryFallbackAudio(itemId, slow, item, playBtns, failedPath) {
-    this._updateDebugInfo(`MP3加载失败(${failedPath})，尝试base64...`);
-
-    const audioEl = document.getElementById('listening-audio');
+  _tryFallbackAudio(itemId, slow, item, playBtns) {
+    this._updateDebugInfo('MP3播放失败，尝试base64...');
 
     // 尝试base64降级
     const audioKey = 'listening_' + itemId;
-    if (typeof AUDIO_BASE64 !== 'undefined' && AUDIO_BASE64[audioKey]) {
+    const audioEl = document.getElementById('listening-player-' + itemId);
+
+    if (audioEl && typeof AUDIO_BASE64 !== 'undefined' && AUDIO_BASE64[audioKey]) {
       audioEl.src = AUDIO_BASE64[audioKey];
       audioEl.playbackRate = slow ? 0.6 : 0.9;
 
@@ -542,10 +547,10 @@ const App = {
 
   stopListening() {
     clearTimeout(this._audioTimeout);
-    const audioEl = document.getElementById('listening-audio');
-    if (audioEl) {
+    // 停止所有可能正在播放的audio元素
+    document.querySelectorAll('audio[id^="listening-player-"]').forEach(audioEl => {
       try { audioEl.pause(); audioEl.currentTime = 0; } catch(e){}
-    }
+    });
     if (this.speechSynthesis) {
       try { this.speechSynthesis.cancel(); } catch(e){}
     }
