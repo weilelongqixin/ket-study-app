@@ -163,7 +163,7 @@ const App = {
           <div class="word-instruction">这个单词是什么意思？</div>
           <div class="word-options">
             ${options.map((opt, i) => `
-              <button class="word-option" onclick="App.answerWord(${i === options.indexOf(word.translation)})" data-value="${opt}">
+              <button class="word-option" onclick="App.answerWord(${i}, ${options.indexOf(word.translation)})" data-value="${opt}">
                 ${opt}
               </button>
             `).join('')}
@@ -173,43 +173,33 @@ const App = {
     }
   },
 
-  answerWord(correct) {
+  answerWord(selectedIdx, correctIdx) {
     const word = this.wordState.words[this.wordState.index];
+    const correct = selectedIdx === correctIdx;
+    
+    // 记录答题结果但不告诉孩子对错
     Storage.recordAnswer(correct, 'words', word.word);
     Storage.updateWordStat(word.word, correct);
+    this.wordState.answers = this.wordState.answers || [];
+    this.wordState.answers.push({ word: word.word, selected: selectedIdx, correct: correct });
+    if (correct) this.wordState.correct++;
 
-    // 禁用所有选项按钮，防止重复点击
-    document.querySelectorAll('.word-option').forEach(btn => { btn.disabled = true; });
+    // 禁用选项，显示"已选择"状态
+    document.querySelectorAll('.word-option').forEach((btn, i) => {
+      btn.disabled = true;
+      if (i === selectedIdx) btn.style.borderColor = '#1890ff';
+    });
 
-    if (correct) {
-      this.wordState.correct++;
-      this.playSound('correct');
-    } else {
-      this.playSound('wrong');
-    }
-
-    // 直接在word-card里追加结果和下一题按钮
+    // 只显示"下一题"，不显示对错
     const el = document.getElementById('view-words');
-    if (!el) return;
     const card = el.querySelector('.word-card');
-    if (!card) return;
-
-    // 先移除旧的feedback
     const oldFb = card.querySelector('.word-feedback');
     if (oldFb) oldFb.remove();
 
     const feedbackDiv = document.createElement('div');
     feedbackDiv.className = 'word-feedback';
-    feedbackDiv.style.cssText = 'margin-top:15px; padding:15px; border-radius:12px; background:' + (correct ? '#f0fff0' : '#fff0f0') + ';';
-    feedbackDiv.innerHTML = `
-      <div style="font-size:18px; font-weight:bold; color:${correct ? '#52c41a' : '#ff4d4f'}; margin-bottom:8px;">
-        ${correct ? '✅ 正确！' : '❌ 再想想'}
-      </div>
-      <div style="font-size:14px; color:#666; margin-bottom:5px;">${word.word} = <b>${word.translation}</b></div>
-      <div style="font-size:13px; color:#999; margin-bottom:10px;">📝 ${word.example}</div>
-      <button class="btn-small" onclick="App.speak('${word.example.replace(/'/g, "\\'")}')" style="margin-right:8px;">🔊 听发音</button>
-      <button class="btn-primary" onclick="App.nextWord()">下一题 →</button>
-    `;
+    feedbackDiv.style.cssText = 'margin-top:15px; padding:15px; border-radius:12px; background:#f0f5ff; text-align:center;';
+    feedbackDiv.innerHTML = `<button class="btn-primary" onclick="App.nextWord()" style="font-size:18px; padding:12px 40px;">下一题 →</button>`;
     card.appendChild(feedbackDiv);
   },
 
@@ -235,6 +225,7 @@ const App = {
     }
 
     const newAch = Storage.checkAchievements();
+    const wrongCount = this.wordState.total - this.wordState.correct;
     const el = document.getElementById('view-words');
     el.innerHTML = `
       <div class="result-card">
@@ -242,12 +233,14 @@ const App = {
         <h2>单词关卡完成！</h2>
         <div class="result-stars">${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
         <div class="result-stats">
-          <p>正确：${this.wordState.correct} / ${this.wordState.total}</p>
+          <p>答题数：${this.wordState.total}</p>
           <p>用时：${this.wordState.timeSpent || timeSpent} 秒</p>
+          ${wrongCount > 0 ? `<p style="color:#ff4d4f;">❌ 答错 ${wrongCount} 题，需要加油哦！</p>` : `<p style="color:#52c41a;">✅ 全部答对，太棒了！</p>`}
         </div>
         ${newAch.length > 0 ? this.renderNewAchievements(newAch) : ''}
         <div class="result-actions">
-          <button class="btn-primary" onclick="App.startWords()">🔄 再练一组</button>
+          <button class="btn-secondary" onclick="App.showWordAnswers()">📋 查看答案</button>
+          ${wrongCount > 0 ? `<button class="btn-primary" onclick="App.retryWrongWords()">🔄 错题重做 (${wrongCount}题)</button>` : ''}
           <button class="btn-secondary" onclick="App.showView('home')">🏠 返回首页</button>
         </div>
       </div>
@@ -255,8 +248,42 @@ const App = {
     this.updateHomeStats();
   },
 
-  // ============ READING MODULE ============
-  readingState: { index: 0, qIndex: 0, correct: 0, total: 0, startTime: 0 },
+  // 查看单词答案
+  showWordAnswers() {
+    const el = document.getElementById('view-words');
+    const answers = this.wordState.answers || [];
+    const words = this.wordState.words;
+    el.innerHTML = `
+      <div class="module-header">
+        <div class="module-progress">📋 答案详情</div>
+      </div>
+      ${words.map((w, i) => {
+        const ans = answers[i];
+        const isWrong = ans && !ans.correct;
+        return `
+          <div style="padding:12px; margin:8px 0; border-radius:10px; background:${isWrong ? '#fff1f0' : '#f6ffed'}; border:2px solid ${isWrong ? '#ffa39e' : '#b7eb8f'};">
+            <div style="font-size:16px; font-weight:bold;">${isWrong ? '❌' : '✅'} ${w.word}</div>
+            <div style="font-size:14px; color:#666;">中文：<b>${w.translation}</b></div>
+            <div style="font-size:13px; color:#999; margin-top:4px;">📝 ${w.example}</div>
+          </div>
+        `;
+      }).join('')}
+      <div style="text-align:center; margin-top:15px;">
+        <button class="btn-primary" onclick="App.startWords()">🔄 再练一组</button>
+        <button class="btn-secondary" onclick="App.showView('home')">🏠 返回首页</button>
+      </div>
+    `;
+  },
+
+  // 错题重做（单词）
+  retryWrongWords() {
+    const answers = this.wordState.answers || [];
+    const wrongIndices = answers.map((a, i) => !a.correct ? i : -1).filter(i => i >= 0);
+    const wrongWords = wrongIndices.map(i => this.wordState.words[i]);
+    if (wrongWords.length === 0) return;
+    this.wordState = { index: 0, words: wrongWords, mode: 'select', correct: 0, total: wrongWords.length, startTime: Date.now(), answers: [] };
+    this.renderWordQuestion();
+  },
 
   startReading() {
     const idx = Math.floor(Math.random() * KET_READING.length);
@@ -289,7 +316,7 @@ const App = {
           <div class="question-text">${question.q}</div>
           <div class="reading-options">
             ${question.options.map((opt, i) => `
-              <button class="reading-option" onclick="App.answerReading(${i === question.answer})">
+              <button class="reading-option" onclick="App.answerReading(${i}, ${question.answer})">
                 <span class="option-letter">${String.fromCharCode(65 + i)}</span> ${opt}
               </button>
             `).join('')}
@@ -300,29 +327,24 @@ const App = {
     `;
   },
 
-  answerReading(correct) {
-    const { passage, qIndex } = this.readingState;
-    const question = passage.questions[qIndex];
+  answerReading(selectedIdx, correctIdx) {
+    const correct = selectedIdx === correctIdx;
     Storage.recordAnswer(correct, 'reading');
+    this.readingState.answers = this.readingState.answers || [];
+    this.readingState.answers.push({ qIndex: this.readingState.qIndex, selected: selectedIdx, correct: correct });
+    if (correct) this.readingState.correct++;
 
-    if (correct) {
-      this.readingState.correct++;
-      this.showFeedback(true, `✅ 回答正确！`);
-      this.playSound('correct');
-    } else {
-      const correctAnswer = question.options[question.answer];
-      this.showFeedback(false, `❌ 正确答案是：${correctAnswer}`);
-      this.playSound('wrong');
+    // 禁用选项，不显示对错
+    document.querySelectorAll('.reading-option').forEach((btn, i) => {
+      btn.disabled = true;
+      if (i === selectedIdx) btn.style.borderColor = '#1890ff';
+    });
+
+    // 只显示下一题
+    const fb = document.getElementById('reading-feedback');
+    if (fb) {
+      fb.innerHTML = `<div style="text-align:center; margin-top:10px;"><button class="btn-primary" onclick="App.nextReading()" style="font-size:18px; padding:12px 40px;">下一题 →</button></div>`;
     }
-
-    setTimeout(() => {
-      const fb = document.getElementById('reading-feedback');
-      if (fb) {
-        fb.innerHTML += `
-          <button class="btn-small btn-next" onclick="App.nextReading()">下一题 →</button>
-        `;
-      }
-    }, 500);
   },
 
   nextReading() {
@@ -402,7 +424,7 @@ const App = {
           <div class="question-text">${question.q}</div>
           <div class="listening-options">
             ${question.options.map((opt, i) => `
-              <button class="listening-option" onclick="App.answerListening(${i === question.answer})">
+              <button class="listening-option" onclick="App.answerListening(${i}, ${question.answer})">
                 <span class="option-letter">${String.fromCharCode(65 + i)}</span> ${opt}
               </button>
             `).join('')}
@@ -584,27 +606,22 @@ const App = {
     this.speechSynthesis.speak(u);
   },
 
-  answerListening(correct) {
-    const { item, qIndex } = this.listeningState;
-    const question = item.questions[qIndex];
+  answerListening(selectedIdx, correctIdx) {
+    const correct = selectedIdx === correctIdx;
     Storage.recordAnswer(correct, 'listening');
+    this.listeningState.answers = this.listeningState.answers || [];
+    this.listeningState.answers.push({ qIndex: this.listeningState.qIndex, selected: selectedIdx, correct: correct });
+    if (correct) this.listeningState.correct++;
 
-    if (correct) {
-      this.listeningState.correct++;
-      this.showFeedback(true, `✅ 回答正确！`);
-      this.playSound('correct');
-    } else {
-      const correctAnswer = question.options[question.answer];
-      this.showFeedback(false, `❌ 正确答案是：${correctAnswer}`);
-      this.playSound('wrong');
+    document.querySelectorAll('.listening-option').forEach((btn, i) => {
+      btn.disabled = true;
+      if (i === selectedIdx) btn.style.borderColor = '#1890ff';
+    });
+
+    const fb = document.getElementById('listening-feedback');
+    if (fb) {
+      fb.innerHTML = `<div style="text-align:center; margin-top:10px;"><button class="btn-primary" onclick="App.nextListening()" style="font-size:18px; padding:12px 40px;">下一题 →</button></div>`;
     }
-
-    setTimeout(() => {
-      const fb = document.getElementById('listening-feedback');
-      if (fb) {
-        fb.innerHTML += `<button class="btn-small btn-next" onclick="App.nextListening()">下一题 →</button>`;
-      }
-    }, 500);
   },
 
   nextListening() {
@@ -723,7 +740,7 @@ const App = {
           <div class="question-text">${question.q}</div>
           <div class="listening-options">
             ${question.options.map((opt, i) => `
-              <button class="listening-option" onclick="App.answerExam(${i === question.answer})">
+              <button class="listening-option" onclick="App.answerExam(${i}, ${question.answer})">
                 <span class="option-letter">${String.fromCharCode(65 + i)}</span> ${opt}
               </button>
             `).join('')}
@@ -826,7 +843,7 @@ const App = {
         ${question.q ? `<div class="question-text">${question.q}</div>` : ''}
         <div class="exam-options">
           ${(question.options || []).map((opt, i) => `
-            <button class="exam-option" onclick="App.answerExam(${i === question.answer})">
+            <button class="exam-option" onclick="App.answerExam(${i}, ${question.answer})">
               <span class="option-letter">${String.fromCharCode(65 + i)}</span> ${opt}
             </button>
           `).join('')}
@@ -836,22 +853,21 @@ const App = {
     `;
   },
 
-  answerExam(correct) {
+  answerExam(selectedIdx, correctIdx) {
+    const correct = selectedIdx === correctIdx;
     Storage.recordAnswer(correct, 'exam');
-    if (correct) {
-      this.examState.correct++;
-      this.showFeedback(true, '✅ 正确！');
-      this.playSound('correct');
-    } else {
-      const question = this.examState.questions[this.examState.qIndex];
-      const correctAns = question.options ? question.options[question.answer] : '';
-      this.showFeedback(false, `❌ 正确答案：${correctAns}`);
-      this.playSound('wrong');
+    this.examState.answers = this.examState.answers || [];
+    this.examState.answers.push({ qIndex: this.examState.qIndex, selected: selectedIdx, correct: correct });
+    if (correct) this.examState.correct++;
+
+    document.querySelectorAll('.exam-option, .listening-option').forEach((btn, i) => {
+      btn.disabled = true;
+    });
+
+    const fb = document.getElementById('exam-feedback');
+    if (fb) {
+      fb.innerHTML = `<div style="text-align:center; margin-top:10px;"><button class="btn-primary" onclick="App.nextExam()" style="font-size:18px; padding:12px 40px;">下一题 →</button></div>`;
     }
-    setTimeout(() => {
-      const fb = document.getElementById('exam-feedback');
-      if (fb) fb.innerHTML += `<button class="btn-small btn-next" onclick="App.nextExam()">下一题 →</button>`;
-    }, 500);
   },
 
   answerFill() {
@@ -863,18 +879,15 @@ const App = {
     const correct = userAns === correctAns;
 
     Storage.recordAnswer(correct, 'exam');
-    if (correct) {
-      this.examState.correct++;
-      this.showFeedback(true, `✅ 正确！答案是：${question.answer}`);
-      this.playSound('correct');
-    } else {
-      this.showFeedback(false, `❌ 正确答案：${question.answer}`);
-      this.playSound('wrong');
+    this.examState.answers = this.examState.answers || [];
+    this.examState.answers.push({ qIndex: this.examState.qIndex, selected: userAns, correct: correct, type: 'fill' });
+    if (correct) this.examState.correct++;
+
+    input.disabled = true;
+    const fb = document.getElementById('exam-feedback');
+    if (fb) {
+      fb.innerHTML = `<div style="text-align:center; margin-top:10px;"><button class="btn-primary" onclick="App.nextExam()" style="font-size:18px; padding:12px 40px;">下一题 →</button></div>`;
     }
-    setTimeout(() => {
-      const fb = document.getElementById('exam-feedback');
-      if (fb) fb.innerHTML += `<button class="btn-small btn-next" onclick="App.nextExam()">下一题 →</button>`;
-    }, 500);
   },
 
   submitWriting() {
