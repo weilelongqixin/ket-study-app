@@ -1252,7 +1252,6 @@ const App = {
         `).join('')}
       </div>
     `;
-  }
   },
 
   // ============ AUTHENTIC LISTENING (真题听力) ============
