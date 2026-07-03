@@ -338,6 +338,9 @@ const App = {
   },
 
   answerReading(selectedIdx, correctIdx) {
+    if (this._readingLocked) return; // 防止多次点击
+    this._readingLocked = true;
+    
     const correct = selectedIdx === correctIdx;
     Storage.recordAnswer(correct, 'reading');
     this.readingState.answers = this.readingState.answers || [];
@@ -345,12 +348,17 @@ const App = {
     if (correct) this.readingState.correct++;
 
     // 禁用选项，不显示对错
-    // 只禁用当前这道题的选项
     var container = document.querySelector('.reading-options');
     if (container) {
       container.querySelectorAll('.reading-option').forEach(function(btn, i) {
         btn.disabled = true;
-        if (i === selectedIdx) btn.style.borderColor = '#1890ff';
+        btn.style.pointerEvents = 'none'; // 彻底禁止点击
+        btn.style.opacity = '0.5';
+        if (i === selectedIdx) {
+          btn.style.borderColor = '#1890ff';
+          btn.style.opacity = '1';
+          btn.style.background = '#e6f7ff';
+        }
       });
     }
 
@@ -362,6 +370,7 @@ const App = {
   },
 
   nextReading() {
+    this._readingLocked = false; // 解锁
     this.readingState.qIndex++;
     this.renderReadingQuestion();
   },
@@ -628,18 +637,27 @@ const App = {
   },
 
   answerListening(selectedIdx, correctIdx) {
+    if (this._listeningLocked) return; // 防止多次点击
+    this._listeningLocked = true;
+    
     const correct = selectedIdx === correctIdx;
     Storage.recordAnswer(correct, 'listening');
     this.listeningState.answers = this.listeningState.answers || [];
     this.listeningState.answers.push({ qIndex: this.listeningState.qIndex, selected: selectedIdx, correct: correct });
     if (correct) this.listeningState.correct++;
 
-    // 只禁用当前这道题的选项
+    // 禁用选项
     var container = document.querySelector('.listening-options');
     if (container) {
       container.querySelectorAll('.listening-option').forEach(function(btn, i) {
         btn.disabled = true;
-        if (i === selectedIdx) btn.style.borderColor = '#1890ff';
+        btn.style.pointerEvents = 'none'; // 彻底禁止点击
+        btn.style.opacity = '0.5';
+        if (i === selectedIdx) {
+          btn.style.borderColor = '#1890ff';
+          btn.style.opacity = '1';
+          btn.style.background = '#e6f7ff';
+        }
       });
     }
 
@@ -650,6 +668,7 @@ const App = {
   },
 
   nextListening() {
+    this._listeningLocked = false; // 解锁
     this.listeningState.qIndex++;
     this.renderListeningQuestion();
   },
@@ -879,14 +898,19 @@ const App = {
   },
 
   answerExam(selectedIdx, correctIdx) {
+    if (this._examLocked) return;
+    this._examLocked = true;
+    
     const correct = selectedIdx === correctIdx;
     Storage.recordAnswer(correct, 'exam');
     this.examState.answers = this.examState.answers || [];
     this.examState.answers.push({ qIndex: this.examState.qIndex, selected: selectedIdx, correct: correct });
     if (correct) this.examState.correct++;
 
-    document.querySelectorAll('.exam-option, .listening-option').forEach((btn, i) => {
+    document.querySelectorAll('.exam-option, .listening-option').forEach(function(btn, i) {
       btn.disabled = true;
+      btn.style.pointerEvents = 'none';
+      btn.style.opacity = '0.5';
     });
 
     const fb = document.getElementById('exam-feedback');
@@ -952,6 +976,7 @@ const App = {
   },
 
   nextExam() {
+    this._examLocked = false; // 解锁
     this.examState.qIndex++;
     if (this.examState.section.includes('听力')) {
       this.renderExamListening();
