@@ -411,41 +411,63 @@ const App = {
     if (!item) return;
 
     const playBtns = document.querySelectorAll('.btn-play');
-    playBtns.forEach(b => { b.textContent = '⏳ 播放中...'; });
+    playBtns.forEach(b => { b.textContent = '⏳ 加载中...'; });
 
-    // 直接用预生成的MP3音频文件
-    if (!this._audioPlayer) this._audioPlayer = new Audio();
+    // 创建新的Audio对象（避免复用导致的缓存问题）
+    this._audioPlayer = new Audio();
     
-    const audioUrl = `assets/audio/listening_${itemId}.mp3`;
+    // 音频路径：确保在任何环境下都能找到
+    const base = window.location.pathname.replace(/\/[^/]*$/, '/');
+    const audioUrl = base + 'assets/audio/listening_' + itemId + '.mp3';
+    console.log('音频路径:', audioUrl);
+    
     this._audioPlayer.src = audioUrl;
-    this._audioPlayer.playbackRate = slow ? 0.6 : 0.9;
+    this._audioPlayer.crossOrigin = 'anonymous';
+    this._audioPlayer.preload = 'auto';
+    if (slow) this._audioPlayer.playbackRate = 0.6;
     
-    this._audioPlayer.play().then(() => {
-      playBtns.forEach(b => { b.textContent = '⏸️ 正在播放...'; });
-    }).catch(err => {
-      console.warn('Audio play failed:', err);
-      // 降级：尝试Web Speech API
-      if (this.speechSynthesis && typeof SpeechSynthesisUtterance !== 'undefined') {
-        try {
-          const utterance = new SpeechSynthesisUtterance(item.transcript);
-          utterance.lang = 'en-US';
-          utterance.rate = slow ? 0.6 : this.selectedSpeechRate;
-          this.speechSynthesis.speak(utterance);
-          playBtns.forEach(b => { b.textContent = '⏸️ 正在播放...'; });
-        } catch(e) {
-          this._showListenFallback(item, playBtns);
-        }
-      } else {
-        this._showListenFallback(item, playBtns);
+    this._audioPlayer.addEventListener('canplay', () => {
+      console.log('音频已加载，开始播放');
+      this._audioPlayer.play().then(() => {
+        playBtns.forEach(b => { b.textContent = '🔊 正在播放'; });
+      }).catch(err => {
+        console.error('播放失败:', err);
+        this._trySpeechSynthesis(item, slow, playBtns);
+      });
+    }, { once: true });
+    
+    this._audioPlayer.addEventListener('error', (e) => {
+      console.error('音频加载失败:', e, '路径:', audioUrl);
+      this._trySpeechSynthesis(item, slow, playBtns);
+    }, { once: true });
+    
+    // 触发加载
+    this._audioPlayer.load();
+    
+    // 超时检测：5秒后如果还没播放，尝试降级
+    clearTimeout(this._audioTimeout);
+    this._audioTimeout = setTimeout(() => {
+      if (this._audioPlayer && this._audioPlayer.paused) {
+        console.warn('音频5秒未开始播放，降级到语音合成');
+        this._trySpeechSynthesis(item, slow, playBtns);
       }
-    });
-    
-    this._audioPlayer.onended = () => {
-      playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
-    };
-    this._audioPlayer.onerror = () => {
-      this._showListenFallback(item, playBtns);
-    };
+    }, 5000);
+  },
+
+  _trySpeechSynthesis(item, slow, playBtns) {
+    if (this.speechSynthesis && typeof SpeechSynthesisUtterance !== 'undefined') {
+      try {
+        this.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(item.transcript);
+        u.lang = 'en-US';
+        u.rate = slow ? 0.6 : 0.9;
+        u.onstart = () => playBtns.forEach(b => { b.textContent = '🔊 正在播放'; });
+        u.onend = () => playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+        this.speechSynthesis.speak(u);
+        return;
+      } catch(e) { console.warn('SpeechSynthesis也失败:', e); }
+    }
+    this._showListenFallback(item, playBtns);
   },
 
   _showListenFallback(item, playBtns) {
@@ -459,9 +481,14 @@ const App = {
   },
 
   stopListening() {
-    if (this.speechSynthesis) {
-      this.speechSynthesis.cancel();
+    clearTimeout(this._audioTimeout);
+    if (this._audioPlayer) {
+      try { this._audioPlayer.pause(); this._audioPlayer.currentTime = 0; } catch(e){}
     }
+    if (this.speechSynthesis) {
+      try { this.speechSynthesis.cancel(); } catch(e){}
+    }
+    document.querySelectorAll('.btn-play').forEach(b => { b.textContent = '▶️ 播放听力'; });
   },
 
   speak(text) {
