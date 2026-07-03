@@ -42,6 +42,7 @@ const App = {
       case 'reading': this.startReading(); break;
       case 'listening': this.startListening(); break;
       case 'exam': this.startExam(); break;
+      case 'authentic': this.showAuthenticListening(); break;
       case 'parent': this.showParentLogin(); break;
     }
   },
@@ -1251,6 +1252,119 @@ const App = {
         `).join('')}
       </div>
     `;
+  }
+  },
+
+  // ============ AUTHENTIC LISTENING (真题听力) ============
+
+  authListenState: { selectedId: null, startTime: 0 },
+
+  showAuthenticListening() {
+    const el = document.getElementById('view-authentic');
+    if (!el) return;
+    const completed = Storage.get('authenticCompleted', []);
+    var self = this;
+
+    el.innerHTML = '\
+      <div class="module-header">\
+        <div class="module-progress">🎧 KET真题听力 · 2024-2025原版音频</div>\
+      </div>\
+      <div style="padding:10px; background:#fff3e0; border-radius:10px; margin-bottom:15px; font-size:13px; color:#e65100;">\
+        💡 这些是剑桥KET考试的原版听力音频，每套约20-25分钟。建议戴耳机在安静环境下练习，模拟真实考试体验。\
+      </div>\
+      ' + AUTHENTIC_LISTENING.map(function(test) {
+        var isDone = completed.indexOf(test.id) >= 0;
+        return '<div style="padding:15px; margin:10px 0; border-radius:14px; background:' + (isDone ? '#f0fff0' : '#fff') + '; border:2px solid ' + (isDone ? '#b7eb8f' : '#e8e8e8') + '; cursor:pointer;" onclick="App.startAuthListen(' + test.id + ')">' +
+          '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+            '<div>' +
+              '<div style="font-size:16px; font-weight:bold;">🎧 ' + test.title + '</div>' +
+              '<div style="font-size:13px; color:#999; margin-top:4px;">⏱️ ' + test.duration + ' · ' + test.year + '年真题</div>' +
+            '</div>' +
+            '<div style="font-size:24px;">' + (isDone ? '✅' : '▶️') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') + '\
+      <div style="text-align:center; margin-top:15px;">\
+        <button class="btn-secondary" onclick="App.showView(\'home\')">🏠 返回首页</button>\
+      </div>';
+  },
+
+  startAuthListen(testId) {
+    const test = AUTHENTIC_LISTENING.find(function(t) { return t.id === testId; });
+    if (!test) return;
+
+    this.authListenState = { selectedId: testId, startTime: Date.now() };
+    const el = document.getElementById('view-authentic');
+    var self = this;
+
+    el.innerHTML = '\
+      <div class="module-header">\
+        <div class="module-progress">🎧 ' + test.title + '</div>\
+        <div style="font-size:13px; color:#999; margin-top:4px;">' + test.year + '年真题 · ' + test.duration + '</div>\
+      </div>\
+      <div style="padding:15px; background:#fafafa; border-radius:14px; margin-bottom:15px;">\
+        <audio id="auth-audio" controls preload="auto" style="width:100%;" src="' + test.audio + '">您的浏览器不支持音频播放</audio>\
+      </div>\
+      <div style="display:grid; gap:8px;">' +
+        test.parts.map(function(p) {
+          return '<div style="padding:12px; border-radius:10px; background:#f8fafc; border:1px solid #e8e8e8;">' +
+            '<div style="font-weight:bold; font-size:15px; color:#1890ff;">' + p.name + '</div>' +
+            '<div style="font-size:13px; color:#666; margin-top:3px;">' + p.desc + '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>\
+      <div style="margin-top:15px; padding:15px; background:#e3f2fd; border-radius:10px;">\
+        <div style="font-weight:bold; margin-bottom:8px;">📝 练习建议：</div>\
+        <ul style="font-size:13px; color:#555; padding-left:20px; margin:0;">\
+          <li>第一遍：不看字幕，认真听</li>\
+          <li>第二遍：对照英文原文听</li>\
+          <li>第三遍：跟读模仿发音</li>\
+        </ul>\
+      </div>' +
+      (test.subtitle ? '<details style="margin-top:10px;"><summary style="cursor:pointer; padding:10px; background:#f0f0f0; border-radius:8px; font-size:14px;">📄 点击查看听力原文</summary><div id="subtitle-display" style="padding:15px; background:#fafafa; border-radius:0 0 8px 8px; font-size:14px; line-height:1.8; color:#555; max-height:300px; overflow-y:auto;"><button class="btn-small" onclick="App.loadSubtitle(\'' + test.subtitle + '\')">加载听力原文...</button></div></details>' : '') +
+      '<div style="text-align:center; margin-top:15px;">' +
+        '<button class="btn-primary" onclick="App.completeAuthListen(' + test.id + ')">✅ 标记为已完成</button> ' +
+        '<button class="btn-secondary" onclick="App.showAuthenticListening()">← 返回列表</button>' +
+      '</div>';
+  },
+
+  loadSubtitle(srtPath) {
+    fetch(srtPath)
+      .then(function(res) { return res.text(); })
+      .then(function(text) {
+        var display = document.getElementById('subtitle-display');
+        if (!display) return;
+        var lines = text.split('\n');
+        var html = '';
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (/^\d+$/.test(line)) continue;
+          if (/\d{2}:\d{2}:/.test(line)) continue;
+          if (line.length > 0) {
+            html += line + ' ';
+            if (line.match(/[.!?]$/)) html += '<br><br>';
+          }
+        }
+        display.innerHTML = html || '原文加载失败';
+      })
+      .catch(function() {
+        var display = document.getElementById('subtitle-display');
+        if (display) display.innerHTML = '<p style="color:#ff4d4f;">原文加载失败</p>';
+      });
+  },
+
+  completeAuthListen(testId) {
+    const completed = Storage.get('authenticCompleted', []);
+    if (completed.indexOf(testId) < 0) {
+      completed.push(testId);
+      Storage.set('authenticCompleted', completed);
+    }
+    const timeSpent = Math.round((Date.now() - this.authListenState.startTime) / 1000);
+    Storage.recordSession('authentic_listening', {
+      stars: 3, correct: 1, total: 1, timeSpent: timeSpent, testId: testId
+    });
+    this.updateHomeStats();
+    this.showAuthenticListening();
   }
 };
 
