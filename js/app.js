@@ -158,8 +158,15 @@ const App = {
           <div class="progress-bar"><div class="progress-fill" style="width:${(index / words.length) * 100}%"></div></div>
         </div>
         <div class="word-card">
-          <div class="word-english">${word.word}</div>
+          <div class="word-english">
+            ${word.word}
+            <button class="btn-small" onclick="App.speak('${word.word}')" style="margin-left:8px; font-size:16px; vertical-align:middle;">🔊</button>
+          </div>
           <div class="word-pos">${word.pos}</div>
+          <div class="word-example" style="background:#f9f9f9; padding:10px; border-radius:8px; margin:10px 0; font-size:14px; color:#555;">
+            📝 ${word.example}
+            <button class="btn-small" onclick="App.speak('${word.example.replace(/'/g, "\\'")}')" style="margin-left:5px;">🔊 听例句</button>
+          </div>
           <div class="word-instruction">这个单词是什么意思？</div>
           <div class="word-options">
             ${options.map((opt, i) => `
