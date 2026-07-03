@@ -126,7 +126,9 @@ const App = {
   startWords() {
     const day = Storage.getCurrentWordDay();
     const dayWords = KET_WORDS.filter(w => w.day === day);
-    this.wordState = { index: 0, words: dayWords, mode: 'select', correct: 0, total: dayWords.length, startTime: Date.now() };
+    // 记录每个单词在全局KET_WORDS中的索引（用于发音文件）
+    const wordGlobalIndices = dayWords.map(w => KET_WORDS.indexOf(w) + 1);
+    this.wordState = { index: 0, words: dayWords, globalIndices: wordGlobalIndices, mode: 'select', correct: 0, total: dayWords.length, startTime: Date.now() };
     this.renderWordQuestion();
   },
 
@@ -160,7 +162,7 @@ const App = {
         <div class="word-card">
           <div class="word-english">
             ${word.word}
-            <button class="btn-small" onclick="App.speak('${word.word}')" style="margin-left:8px; font-size:16px; vertical-align:middle;">🔊</button>
+            <button class="btn-small" onclick="App.speak('${word.word}', 'assets/audio/words/word_${this.wordState.globalIndices[index]}.mp3')" style="margin-left:8px; font-size:16px; vertical-align:middle;">🔊</button>
           </div>
           <div class="word-pos">${word.pos}</div>
           <div class="word-example" style="background:#f9f9f9; padding:10px; border-radius:8px; margin:10px 0; font-size:14px; color:#555;">
@@ -287,8 +289,9 @@ const App = {
     const answers = this.wordState.answers || [];
     const wrongIndices = answers.map((a, i) => !a.correct ? i : -1).filter(i => i >= 0);
     const wrongWords = wrongIndices.map(i => this.wordState.words[i]);
+    const wrongGlobalIndices = wrongIndices.map(i => this.wordState.globalIndices[i]);
     if (wrongWords.length === 0) return;
-    this.wordState = { index: 0, words: wrongWords, mode: 'select', correct: 0, total: wrongWords.length, startTime: Date.now(), answers: [] };
+    this.wordState = { index: 0, words: wrongWords, globalIndices: wrongGlobalIndices, mode: 'select', correct: 0, total: wrongWords.length, startTime: Date.now(), answers: [] };
     this.renderWordQuestion();
   },
 
@@ -599,18 +602,25 @@ const App = {
     this._currentAudioItemId = null;
   },
 
-  speak(text) {
-    if (!this.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
-      // 降级：用Google TTS
-      const audio = new Audio(`https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(text)}`);
-      audio.play().catch(() => {});
+  speak(text, audioPath) {
+    // 如果提供了预生成的音频路径，优先使用
+    if (audioPath) {
+      var a = new Audio(audioPath);
+      a.playbackRate = 0.9;
+      a.play().catch(function(){});
       return;
     }
-    this.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
-    u.rate = this.selectedSpeechRate;
-    this.speechSynthesis.speak(u);
+    // 降级到Web Speech API
+    if (this.speechSynthesis && typeof SpeechSynthesisUtterance !== 'undefined') {
+      try {
+        this.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'en-US';
+        u.rate = this.selectedSpeechRate;
+        this.speechSynthesis.speak(u);
+        return;
+      } catch(e){}
+    }
   },
 
   answerListening(selectedIdx, correctIdx) {
