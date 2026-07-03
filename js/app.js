@@ -413,45 +413,42 @@ const App = {
     const playBtns = document.querySelectorAll('.btn-play');
     playBtns.forEach(b => { b.textContent = '⏳ 加载中...'; });
 
-    // 创建新的Audio对象（避免复用导致的缓存问题）
-    this._audioPlayer = new Audio();
-    
-    // 音频路径：确保在任何环境下都能找到
-    const base = window.location.pathname.replace(/\/[^/]*$/, '/');
-    const audioUrl = base + 'assets/audio/listening_' + itemId + '.mp3';
-    console.log('音频路径:', audioUrl);
-    
-    this._audioPlayer.src = audioUrl;
-    this._audioPlayer.crossOrigin = 'anonymous';
-    this._audioPlayer.preload = 'auto';
-    if (slow) this._audioPlayer.playbackRate = 0.6;
-    
-    this._audioPlayer.addEventListener('canplay', () => {
-      console.log('音频已加载，开始播放');
-      this._audioPlayer.play().then(() => {
-        playBtns.forEach(b => { b.textContent = '🔊 正在播放'; });
-      }).catch(err => {
-        console.error('播放失败:', err);
-        this._trySpeechSynthesis(item, slow, playBtns);
-      });
-    }, { once: true });
-    
-    this._audioPlayer.addEventListener('error', (e) => {
-      console.error('音频加载失败:', e, '路径:', audioUrl);
-      this._trySpeechSynthesis(item, slow, playBtns);
-    }, { once: true });
-    
-    // 触发加载
-    this._audioPlayer.load();
-    
-    // 超时检测：5秒后如果还没播放，尝试降级
-    clearTimeout(this._audioTimeout);
-    this._audioTimeout = setTimeout(() => {
-      if (this._audioPlayer && this._audioPlayer.paused) {
-        console.warn('音频5秒未开始播放，降级到语音合成');
-        this._trySpeechSynthesis(item, slow, playBtns);
+    // 优先使用内嵌base64音频（不依赖网络）
+    const audioKey = 'listening_' + itemId;
+    if (typeof AUDIO_BASE64 !== 'undefined' && AUDIO_BASE64[audioKey]) {
+      try {
+        this._audioPlayer = new Audio(AUDIO_BASE64[audioKey]);
+        this._audioPlayer.playbackRate = slow ? 0.6 : 0.9;
+        
+        this._audioPlayer.addEventListener('canplaythrough', () => {
+          this._audioPlayer.play().then(() => {
+            playBtns.forEach(b => { b.textContent = '🔊 正在播放'; });
+          }).catch(err => {
+            console.error('播放失败:', err);
+            this._trySpeechSynthesis(item, slow, playBtns);
+          });
+        }, { once: true });
+        
+        this._audioPlayer.addEventListener('error', () => {
+          this._trySpeechSynthesis(item, slow, playBtns);
+        }, { once: true });
+        
+        // 超时降级
+        clearTimeout(this._audioTimeout);
+        this._audioTimeout = setTimeout(() => {
+          if (this._audioPlayer && this._audioPlayer.paused) {
+            this._trySpeechSynthesis(item, slow, playBtns);
+          }
+        }, 5000);
+        
+        return;
+      } catch(e) {
+        console.warn('Base64 audio failed:', e);
       }
-    }, 5000);
+    }
+
+    // 降级到语音合成
+    this._trySpeechSynthesis(item, slow, playBtns);
   },
 
   _trySpeechSynthesis(item, slow, playBtns) {
