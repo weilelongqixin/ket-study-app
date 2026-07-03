@@ -345,10 +345,14 @@ const App = {
     if (correct) this.readingState.correct++;
 
     // 禁用选项，不显示对错
-    document.querySelectorAll('.reading-option').forEach((btn, i) => {
-      btn.disabled = true;
-      if (i === selectedIdx) btn.style.borderColor = '#1890ff';
-    });
+    // 只禁用当前这道题的选项
+    var container = document.querySelector('.reading-options');
+    if (container) {
+      container.querySelectorAll('.reading-option').forEach(function(btn, i) {
+        btn.disabled = true;
+        if (i === selectedIdx) btn.style.borderColor = '#1890ff';
+      });
+    }
 
     // 只显示下一题
     const fb = document.getElementById('reading-feedback');
@@ -630,10 +634,14 @@ const App = {
     this.listeningState.answers.push({ qIndex: this.listeningState.qIndex, selected: selectedIdx, correct: correct });
     if (correct) this.listeningState.correct++;
 
-    document.querySelectorAll('.listening-option').forEach((btn, i) => {
-      btn.disabled = true;
-      if (i === selectedIdx) btn.style.borderColor = '#1890ff';
-    });
+    // 只禁用当前这道题的选项
+    var container = document.querySelector('.listening-options');
+    if (container) {
+      container.querySelectorAll('.listening-option').forEach(function(btn, i) {
+        btn.disabled = true;
+        if (i === selectedIdx) btn.style.borderColor = '#1890ff';
+      });
+    }
 
     const fb = document.getElementById('listening-feedback');
     if (fb) {
