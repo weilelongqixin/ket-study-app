@@ -419,8 +419,7 @@ const App = {
       return;
     }
 
-    // ⚠️ 不调用stopListening！那会清空src并打断用户交互链
-    // 只做最小限度的清理
+    // 只做最小限度的清理（不清src，不调load）
     try { audioEl.pause(); } catch(e){}
     if (this.speechSynthesis) { try { this.speechSynthesis.cancel(); } catch(e){} }
     clearTimeout(this._audioTimeout);
@@ -428,31 +427,35 @@ const App = {
     const mp3Path = 'assets/audio/listening_' + itemId + '.mp3';
     this._updateDebugInfo('设置src: ' + mp3Path);
 
-    // 关键：设置src和play必须在同一个用户交互调用栈里完成
+    // 跟测试页面完全一致的方式：设src直接play，不调load()
     audioEl.src = mp3Path;
-    audioEl.muted = false;
-    audioEl.volume = 1.0;
     audioEl.playbackRate = slow ? 0.6 : 0.9;
-    audioEl.load();
 
-    // 立即尝试播放（保持用户交互上下文）
-    const playPromise = audioEl.play();
-    this._updateDebugInfo('play()已调用，等待结果...');
+    var self = this;
+    audioEl.oncanplay = function() {
+      self._updateDebugInfo('音频已加载，正在播放...');
+    };
+    audioEl.onplaying = function() {
+      playBtns.forEach(b => { b.textContent = '🔊 正在播放'; b.disabled = false; });
+      self._updateDebugInfo('✅正在播放!');
+    };
+    audioEl.onended = function() {
+      playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+      self._updateDebugInfo('播放结束');
+    };
+    audioEl.onerror = function(e) {
+      console.error('音频加载失败:', e);
+      self._updateDebugInfo('❌加载失败');
+      self._tryFallbackAudio(itemId, slow, item, playBtns, mp3Path);
+    };
 
-    if (playPromise !== undefined) {
-      playPromise.then(() => {
-        playBtns.forEach(b => { b.textContent = '🔊 正在播放'; b.disabled = false; });
-        this._updateDebugInfo('✅播放成功!');
-        audioEl.onended = () => {
-          playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
-          this._updateDebugInfo('播放结束');
-        };
-      }).catch(err => {
-        console.error('MP3播放失败:', err);
-        this._updateDebugInfo('❌MP3失败: ' + err.name + ' ' + err.message);
-        this._tryFallbackAudio(itemId, slow, item, playBtns, mp3Path);
-      });
-    }
+    audioEl.play().then(function() {
+      self._updateDebugInfo('▶️ play()成功！');
+    }).catch(function(err) {
+      console.error('MP3播放失败:', err);
+      self._updateDebugInfo('❌play失败: ' + err.message);
+      self._tryFallbackAudio(itemId, slow, item, playBtns, mp3Path);
+    });
 
     this._currentAudioItemId = itemId;
   },
