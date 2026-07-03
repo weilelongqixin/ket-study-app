@@ -436,7 +436,7 @@ const App = {
         <h3>👂 ${item.title}</h3>
         <p class="listening-subtitle">${item.subtitle}</p>
         <audio id="listening-player-${item.id}" controls preload="auto" style="width:100%; margin:10px 0;">
-          <source src="assets/audio/listening_${item.id}.mp3" type="audio/mpeg">
+          <source src="${item.audio || 'assets/audio/listening_' + item.id + '.mp3'}" type="audio/mpeg">
           您的浏览器不支持音频播放
         </audio>
         <div class="listening-controls">
