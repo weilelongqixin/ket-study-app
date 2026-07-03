@@ -408,16 +408,47 @@ const App = {
   playListening(itemId, slow) {
     this.stopListening();
     const item = KET_LISTENING.find(l => l.id === itemId);
-    if (!item || !this.speechSynthesis) {
-      alert('抱歉，您的浏览器不支持语音播放功能');
-      return;
+    if (!item) return;
+
+    // 优先使用Web Speech API
+    if (this.speechSynthesis && typeof SpeechSynthesisUtterance !== 'undefined') {
+      try {
+        const utterance = new SpeechSynthesisUtterance(item.transcript);
+        utterance.lang = 'en-US';
+        utterance.rate = slow ? 0.6 : this.selectedSpeechRate;
+        utterance.pitch = 1;
+        // 有时候需要先cancel再speak才能触发
+        this.speechSynthesis.cancel();
+        setTimeout(() => {
+          this.speechSynthesis.speak(utterance);
+        }, 100);
+        return;
+      } catch(e) {
+        console.warn('SpeechSynthesis failed:', e);
+      }
     }
 
-    const utterance = new SpeechSynthesisUtterance(item.transcript);
-    utterance.lang = 'en-US';
-    utterance.rate = slow ? 0.6 : this.selectedSpeechRate;
-    utterance.pitch = 1;
-    this.speechSynthesis.speak(utterance);
+    // 降级方案：用ResponsiveVoice或显示提示+原文
+    const playBtn = document.querySelector('.btn-play');
+    if (playBtn) {
+      playBtn.textContent = '⚠️ 语音不可用，请查看原文';
+      playBtn.style.background = '#faad14';
+    }
+    // 自动展开原文
+    const details = document.querySelector('#view-listening details');
+    if (details) details.open = true;
+    
+    // 尝试用Audio API生成语音（备用）
+    const text = encodeURIComponent(item.transcript);
+    const audio = new Audio(`https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${text}`);
+    audio.playbackRate = slow ? 0.6 : 0.9;
+    audio.play().catch(() => {
+      // 如果Google TTS也不行，提示用户换浏览器
+      const feedback = document.getElementById('listening-feedback');
+      if (feedback) {
+        feedback.innerHTML = '<p style="color:#faad14;">⚠️ 当前浏览器不支持语音播放。建议用<span style="color:#1890ff;">Safari</span>或<span style="color:#1890ff;">Chrome</span>浏览器打开本页面。</p>';
+      }
+    });
   },
 
   stopListening() {
@@ -427,7 +458,12 @@ const App = {
   },
 
   speak(text) {
-    if (!this.speechSynthesis) return;
+    if (!this.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
+      // 降级：用Google TTS
+      const audio = new Audio(`https://translate.google.com/translate_tts?ie=UTF-8&tl=en&client=tw-ob&q=${encodeURIComponent(text)}`);
+      audio.play().catch(() => {});
+      return;
+    }
     this.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'en-US';
