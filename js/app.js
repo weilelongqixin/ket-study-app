@@ -178,31 +178,39 @@ const App = {
     Storage.recordAnswer(correct, 'words', word.word);
     Storage.updateWordStat(word.word, correct);
 
+    // 禁用所有选项按钮，防止重复点击
+    document.querySelectorAll('.word-option').forEach(btn => { btn.disabled = true; });
+
     if (correct) {
       this.wordState.correct++;
-      this.showFeedback(true, `✅ 正确！${word.word} = ${word.translation}`);
-      // Play sound
       this.playSound('correct');
     } else {
-      this.showFeedback(false, `❌ 正确答案是：${word.translation}`);
       this.playSound('wrong');
     }
 
-    // Show example after feedback
-    setTimeout(() => {
-      const el = document.getElementById('view-words');
-      const feedback = el.querySelector('.feedback');
-      if (feedback) {
-        feedback.innerHTML += `
-          <div class="word-example">
-            <div class="example-label">📝 例句：</div>
-            <div class="example-text">${word.example}</div>
-            <button class="btn-small" onclick="App.speak('${word.example}')">🔊 听发音</button>
-            <button class="btn-small btn-next" onclick="App.nextWord()">下一题 →</button>
-          </div>
-        `;
-      }
-    }, 500);
+    // 直接在word-card里追加结果和下一题按钮
+    const el = document.getElementById('view-words');
+    if (!el) return;
+    const card = el.querySelector('.word-card');
+    if (!card) return;
+
+    // 先移除旧的feedback
+    const oldFb = card.querySelector('.word-feedback');
+    if (oldFb) oldFb.remove();
+
+    const feedbackDiv = document.createElement('div');
+    feedbackDiv.className = 'word-feedback';
+    feedbackDiv.style.cssText = 'margin-top:15px; padding:15px; border-radius:12px; background:' + (correct ? '#f0fff0' : '#fff0f0') + ';';
+    feedbackDiv.innerHTML = `
+      <div style="font-size:18px; font-weight:bold; color:${correct ? '#52c41a' : '#ff4d4f'}; margin-bottom:8px;">
+        ${correct ? '✅ 正确！' : '❌ 再想想'}
+      </div>
+      <div style="font-size:14px; color:#666; margin-bottom:5px;">${word.word} = <b>${word.translation}</b></div>
+      <div style="font-size:13px; color:#999; margin-bottom:10px;">📝 ${word.example}</div>
+      <button class="btn-small" onclick="App.speak('${word.example.replace(/'/g, "\\'")}')" style="margin-right:8px;">🔊 听发音</button>
+      <button class="btn-primary" onclick="App.nextWord()">下一题 →</button>
+    `;
+    card.appendChild(feedbackDiv);
   },
 
   nextWord() {
@@ -879,17 +887,21 @@ const App = {
 
     Storage.recordAnswer(true, 'exam');
     this.examState.correct++;
-    this.showFeedback(true, '✅ 写作完成！做得很好！');
 
     const question = this.examState.questions[this.examState.qIndex];
-    if (question.model) {
-      const fb = document.getElementById('exam-feedback');
-      fb.innerHTML += `
-        <div class="writing-comparison">
-          <h4>📝 范文参考：</h4>
-          <div class="model-answer">${question.model.replace(/\n/g, '<br>')}</div>
+    const fb = document.getElementById('exam-feedback');
+    if (fb) {
+      fb.innerHTML = `
+        <div style="margin-top:15px; padding:15px; border-radius:12px; background:#f0fff0;">
+          <div style="font-size:18px; font-weight:bold; color:#52c41a; margin-bottom:8px;">✅ 写作完成！做得很好！</div>
+          <div style="font-size:14px; color:#666;">你写了 <b>${ta.value.trim().split(/\s+/).filter(w=>w.length>0).length}</b> 个单词</div>
+          ${question.model ? `
+            <div style="margin-top:10px; padding:10px; background:#fafafa; border-radius:8px;">
+              <b>📝 范文参考：</b><br>${question.model.replace(/\n/g, '<br>')}
+            </div>
+          ` : ''}
+          <button class="btn-primary" onclick="App.nextExam()" style="margin-top:10px;">下一题 →</button>
         </div>
-        <button class="btn-small btn-next" onclick="App.nextExam()">下一题 →</button>
       `;
     }
   },
