@@ -397,6 +397,7 @@ const App = {
           </div>
         </div>
         <div class="feedback" id="listening-feedback"></div>
+        <div class="audio-debug" id="audio-debug" style="color:#999; font-size:12px; margin:5px 0; min-height:18px;"></div>
         <details class="transcript-details">
           <summary>📝 查看听力原文</summary>
           <div class="transcript-text">${item.transcript}</div>
@@ -411,44 +412,84 @@ const App = {
     if (!item) return;
 
     const playBtns = document.querySelectorAll('.btn-play');
-    playBtns.forEach(b => { b.textContent = '⏳ 加载中...'; });
+    playBtns.forEach(b => { b.textContent = '⏳ 加载中...'; b.disabled = true; });
 
-    // 优先使用内嵌base64音频（不依赖网络）
-    const audioKey = 'listening_' + itemId;
-    if (typeof AUDIO_BASE64 !== 'undefined' && AUDIO_BASE64[audioKey]) {
-      try {
-        this._audioPlayer = new Audio(AUDIO_BASE64[audioKey]);
-        this._audioPlayer.playbackRate = slow ? 0.6 : 0.9;
-        
-        this._audioPlayer.addEventListener('canplaythrough', () => {
-          this._audioPlayer.play().then(() => {
-            playBtns.forEach(b => { b.textContent = '🔊 正在播放'; });
-          }).catch(err => {
-            console.error('播放失败:', err);
-            this._trySpeechSynthesis(item, slow, playBtns);
-          });
-        }, { once: true });
-        
-        this._audioPlayer.addEventListener('error', () => {
-          this._trySpeechSynthesis(item, slow, playBtns);
-        }, { once: true });
-        
-        // 超时降级
-        clearTimeout(this._audioTimeout);
-        this._audioTimeout = setTimeout(() => {
-          if (this._audioPlayer && this._audioPlayer.paused) {
-            this._trySpeechSynthesis(item, slow, playBtns);
-          }
-        }, 5000);
-        
-        return;
-      } catch(e) {
-        console.warn('Base64 audio failed:', e);
-      }
+    // 获取audio标签（比new Audio()更兼容移动端）
+    const audioEl = document.getElementById('listening-audio');
+    if (!audioEl) {
+      console.error('Audio element not found!');
+      this._showListenFallback(item, playBtns, 'Audio element missing');
+      return;
     }
 
-    // 降级到语音合成
-    this._trySpeechSynthesis(item, slow, playBtns);
+    // 优先使用外部MP3文件（加载快，体积小）
+    const mp3Path = `assets/audio/listening_${itemId}.mp3`;
+    audioEl.src = mp3Path;
+    audioEl.playbackRate = slow ? 0.6 : 0.9;
+
+    // 设置调试信息
+    this._updateDebugInfo('正在加载音频: ' + mp3Path);
+
+    // 直接尝试播放，不等待canplaythrough
+    const playPromise = audioEl.play();
+
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          playBtns.forEach(b => { b.textContent = '🔊 正在播放'; b.disabled = false; });
+          this._updateDebugInfo('播放成功!');
+          // 播放结束后恢复按钮状态
+          audioEl.onended = () => {
+            playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+            this._updateDebugInfo('播放结束');
+          };
+        })
+        .catch(err => {
+          console.error('播放失败:', err);
+          this._updateDebugInfo('播放失败: ' + err.message);
+          // 尝试降级方案
+          this._tryFallbackAudio(itemId, slow, item, playBtns, mp3Path);
+        });
+    } else {
+      // 旧浏览器不支持Promise
+      playBtns.forEach(b => { b.textContent = '🔊 正在播放'; b.disabled = false; });
+      audioEl.onended = () => {
+        playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+      };
+    }
+
+    // 保存当前音频状态
+    this._currentAudioItemId = itemId;
+  },
+
+  _tryFallbackAudio(itemId, slow, item, playBtns, failedPath) {
+    this._updateDebugInfo(`MP3加载失败(${failedPath})，尝试base64...`);
+
+    const audioEl = document.getElementById('listening-audio');
+
+    // 尝试base64降级
+    const audioKey = 'listening_' + itemId;
+    if (typeof AUDIO_BASE64 !== 'undefined' && AUDIO_BASE64[audioKey]) {
+      audioEl.src = AUDIO_BASE64[audioKey];
+      audioEl.playbackRate = slow ? 0.6 : 0.9;
+
+      audioEl.play()
+        .then(() => {
+          playBtns.forEach(b => { b.textContent = '🔊 正在播放(base64)'; b.disabled = false; });
+          this._updateDebugInfo('Base64播放成功!');
+          audioEl.onended = () => {
+            playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+          };
+        })
+        .catch(err => {
+          console.error('Base64播放也失败:', err);
+          this._updateDebugInfo('Base64播放失败，尝试语音合成...');
+          this._trySpeechSynthesis(item, slow, playBtns);
+        });
+    } else {
+      this._updateDebugInfo('没有base64数据，尝试语音合成...');
+      this._trySpeechSynthesis(item, slow, playBtns);
+    }
   },
 
   _trySpeechSynthesis(item, slow, playBtns) {
@@ -458,34 +499,73 @@ const App = {
         const u = new SpeechSynthesisUtterance(item.transcript);
         u.lang = 'en-US';
         u.rate = slow ? 0.6 : 0.9;
-        u.onstart = () => playBtns.forEach(b => { b.textContent = '🔊 正在播放'; });
-        u.onend = () => playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+        u.onstart = () => {
+          playBtns.forEach(b => { b.textContent = '🔊 正在播放(TTS)'; b.disabled = false; });
+          this._updateDebugInfo('语音合成播放中...');
+        };
+        u.onend = () => {
+          playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+          this._updateDebugInfo('语音合成播放结束');
+        };
+        u.onerror = (e) => {
+          console.error('TTS错误:', e);
+          this._showListenFallback(item, playBtns, 'TTS错误');
+        };
         this.speechSynthesis.speak(u);
         return;
-      } catch(e) { console.warn('SpeechSynthesis也失败:', e); }
+      } catch(e) {
+        console.warn('SpeechSynthesis失败:', e);
+        this._showListenFallback(item, playBtns, 'TTS异常: ' + e.message);
+      }
+    } else {
+      this._showListenFallback(item, playBtns, '不支持语音合成');
     }
-    this._showListenFallback(item, playBtns);
   },
 
-  _showListenFallback(item, playBtns) {
-    playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+  _showListenFallback(item, playBtns, reason) {
+    playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; b.disabled = false; });
+    this._updateDebugInfo('降级到原文展示: ' + reason);
     const details = document.querySelector('#view-listening details');
     if (details) details.open = true;
     const feedback = document.getElementById('listening-feedback');
     if (feedback) {
-      feedback.innerHTML = '<p style="color:#faad14; padding:10px; background:#fffbe6; border-radius:8px;">⚠️ 语音播放失败，已展开原文。请大声朗读练习！</p>';
+      feedback.innerHTML = `<p style="color:#faad14; padding:10px; background:#fffbe6; border-radius:8px;">⚠️ 音频播放失败(${reason})，已展开原文。请大声朗读练习！</p>`;
     }
   },
 
+  _updateDebugInfo(msg) {
+    const debugEl = document.getElementById('audio-debug');
+    if (debugEl) {
+      const time = new Date().toLocaleTimeString();
+      debugEl.innerHTML = `<small>[${time}] ${msg}</small>`;
+    }
+    console.log('[Audio Debug]', msg);
+  },
+
   stopListening() {
-    clearTimeout(this._audioTimeout);
-    if (this._audioPlayer) {
-      try { this._audioPlayer.pause(); this._audioPlayer.currentTime = 0; } catch(e){}
+    const audioEl = document.getElementById('listening-audio');
+    if (audioEl) {
+      try {
+        audioEl.pause();
+        audioEl.currentTime = 0;
+        audioEl.src = '';
+      } catch(e) {
+        console.error('停止音频失败:', e);
+      }
     }
     if (this.speechSynthesis) {
-      try { this.speechSynthesis.cancel(); } catch(e){}
+      try {
+        this.speechSynthesis.cancel();
+      } catch(e) {
+        console.error('停止TTS失败:', e);
+      }
     }
-    document.querySelectorAll('.btn-play').forEach(b => { b.textContent = '▶️ 播放听力'; });
+    document.querySelectorAll('.btn-play').forEach(b => {
+      b.textContent = '▶️ 播放听力';
+      b.disabled = false;
+    });
+    this._updateDebugInfo('已停止播放');
+    this._currentAudioItemId = null;
   },
 
   speak(text) {
@@ -633,8 +713,8 @@ const App = {
       <div class="listening-card">
         <h3>👂 ${listeningItem.title}</h3>
         <div class="listening-controls">
-          <button class="btn-play" onclick="App.playListening(${listeningItem.id})">▶️ 播放</button>
-          <button class="btn-play" onclick="App.playListening(${listeningItem.id}, true)">▶️ 慢速</button>
+          <button class="btn-play" onclick="App.playListening('${listeningItem.id}')">▶️ 播放</button>
+          <button class="btn-play" onclick="App.playListening('${listeningItem.id}', true)">▶️ 慢速</button>
           <button class="btn-small" onclick="App.stopListening()">⏹️ 停止</button>
         </div>
         <div class="listening-question">
@@ -648,6 +728,7 @@ const App = {
           </div>
         </div>
         <div class="feedback" id="exam-feedback"></div>
+        <div class="audio-debug" id="audio-debug" style="color:#999; font-size:12px; margin:5px 0; min-height:18px;"></div>
         <details class="transcript-details">
           <summary>📝 查看原文</summary>
           <div class="transcript-text">${listeningItem.transcript}</div>
