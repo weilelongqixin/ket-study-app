@@ -407,58 +407,53 @@ const App = {
   },
 
   playListening(itemId, slow) {
-    this.stopListening();
     const item = KET_LISTENING.find(l => l.id === itemId);
     if (!item) return;
 
     const playBtns = document.querySelectorAll('.btn-play');
     playBtns.forEach(b => { b.textContent = '⏳ 加载中...'; b.disabled = true; });
 
-    // 获取audio标签（比new Audio()更兼容移动端）
     const audioEl = document.getElementById('listening-audio');
     if (!audioEl) {
-      console.error('Audio element not found!');
       this._showListenFallback(item, playBtns, 'Audio element missing');
       return;
     }
 
-    // 优先使用外部MP3文件（加载快，体积小）
-    const mp3Path = `assets/audio/listening_${itemId}.mp3`;
+    // ⚠️ 不调用stopListening！那会清空src并打断用户交互链
+    // 只做最小限度的清理
+    try { audioEl.pause(); } catch(e){}
+    if (this.speechSynthesis) { try { this.speechSynthesis.cancel(); } catch(e){} }
+    clearTimeout(this._audioTimeout);
+
+    const mp3Path = 'assets/audio/listening_' + itemId + '.mp3';
+    this._updateDebugInfo('设置src: ' + mp3Path);
+
+    // 关键：设置src和play必须在同一个用户交互调用栈里完成
     audioEl.src = mp3Path;
+    audioEl.muted = false;
+    audioEl.volume = 1.0;
     audioEl.playbackRate = slow ? 0.6 : 0.9;
+    audioEl.load();
 
-    // 设置调试信息
-    this._updateDebugInfo('正在加载音频: ' + mp3Path);
-
-    // 直接尝试播放，不等待canplaythrough
+    // 立即尝试播放（保持用户交互上下文）
     const playPromise = audioEl.play();
+    this._updateDebugInfo('play()已调用，等待结果...');
 
     if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          playBtns.forEach(b => { b.textContent = '🔊 正在播放'; b.disabled = false; });
-          this._updateDebugInfo('播放成功!');
-          // 播放结束后恢复按钮状态
-          audioEl.onended = () => {
-            playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
-            this._updateDebugInfo('播放结束');
-          };
-        })
-        .catch(err => {
-          console.error('播放失败:', err);
-          this._updateDebugInfo('播放失败: ' + err.message);
-          // 尝试降级方案
-          this._tryFallbackAudio(itemId, slow, item, playBtns, mp3Path);
-        });
-    } else {
-      // 旧浏览器不支持Promise
-      playBtns.forEach(b => { b.textContent = '🔊 正在播放'; b.disabled = false; });
-      audioEl.onended = () => {
-        playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
-      };
+      playPromise.then(() => {
+        playBtns.forEach(b => { b.textContent = '🔊 正在播放'; b.disabled = false; });
+        this._updateDebugInfo('✅播放成功!');
+        audioEl.onended = () => {
+          playBtns.forEach(b => { b.textContent = '▶️ 播放听力'; });
+          this._updateDebugInfo('播放结束');
+        };
+      }).catch(err => {
+        console.error('MP3播放失败:', err);
+        this._updateDebugInfo('❌MP3失败: ' + err.name + ' ' + err.message);
+        this._tryFallbackAudio(itemId, slow, item, playBtns, mp3Path);
+      });
     }
 
-    // 保存当前音频状态
     this._currentAudioItemId = itemId;
   },
 
@@ -543,22 +538,13 @@ const App = {
   },
 
   stopListening() {
+    clearTimeout(this._audioTimeout);
     const audioEl = document.getElementById('listening-audio');
     if (audioEl) {
-      try {
-        audioEl.pause();
-        audioEl.currentTime = 0;
-        audioEl.src = '';
-      } catch(e) {
-        console.error('停止音频失败:', e);
-      }
+      try { audioEl.pause(); audioEl.currentTime = 0; } catch(e){}
     }
     if (this.speechSynthesis) {
-      try {
-        this.speechSynthesis.cancel();
-      } catch(e) {
-        console.error('停止TTS失败:', e);
-      }
+      try { this.speechSynthesis.cancel(); } catch(e){}
     }
     document.querySelectorAll('.btn-play').forEach(b => {
       b.textContent = '▶️ 播放听力';
