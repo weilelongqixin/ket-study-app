@@ -110,7 +110,7 @@
     html += '<div class="subject-icon">📖</div>';
     html += '<div class="subject-info">';
     html += '<div class="subject-name">语文</div>';
-    html += '<div class="subject-sub">部编版四年级下册</div>';
+    html += '<div class="subject-sub">部编版五年级上册</div>';
     html += '</div>';
     html += '<div class="subject-status">' + (chineseDone ? '✅ 已完成' : '❌ 未打卡') + '</div>';
     html += '</div>';
@@ -120,7 +120,7 @@
     html += '<div class="subject-icon">🔢</div>';
     html += '<div class="subject-info">';
     html += '<div class="subject-name">数学</div>';
-    html += '<div class="subject-sub">人教版四年级下册</div>';
+    html += '<div class="subject-sub">人教版五年级上册</div>';
     html += '</div>';
     html += '<div class="subject-status">' + (mathDone ? '✅ 已完成' : '❌ 未打卡') + '</div>';
     html += '</div>';
@@ -130,7 +130,7 @@
     html += '<div class="subject-icon">🔤</div>';
     html += '<div class="subject-info">';
     html += '<div class="subject-name">英语</div>';
-    html += '<div class="subject-sub">人教精通版四年级下册</div>';
+    html += '<div class="subject-sub">人教精通版五年级上册</div>';
     html += '</div>';
     html += '<div class="subject-status">' + (englishDone ? '✅ 已完成' : '❌ 未打卡') + '</div>';
     html += '</div>';
