@@ -473,28 +473,101 @@ const App = {
     this.renderWordQuestion();
   },
 
+  selectedReadingDay: null,
+
   startReading() {
-    // 显示阅读真题列表
     const el = document.getElementById('view-reading');
     if (!el) return;
-    var html = '<div class="module-header"><div class="module-progress">📖 阅读真题练习</div></div>';
-    html += '<div style="padding:10px; background:#e3f2fd; border-radius:10px; margin-bottom:15px; font-size:13px; color:#1565c0;">';
-    html += '💡 每套包含 Part 1（通知理解）+ Part 2（匹配题）+ Part 3（长文章），一次性答完再提交';
+    const currentDay = Storage.getCurrentWordDay(); // 复用单词的天数
+    if (!this.selectedReadingDay) this.selectedReadingDay = currentDay;
+    const day = this.selectedReadingDay;
+
+    // 生成天数选择按钮
+    var dayButtons = '';
+    for (var d = 1; d <= 15; d++) {
+      var isCurrent = d === day;
+      var isLearned = d < currentDay;
+      var bg = isCurrent ? '#1890ff' : (isLearned ? '#e8f5e9' : '#f5f5f5');
+      var color = isCurrent ? '#fff' : (isLearned ? '#2e7d32' : '#999');
+      dayButtons += '<button onclick="App.selectReadingDay(' + d + ')" style="width:36px; height:36px; border:none; border-radius:8px; background:' + bg + '; color:' + color + '; font-size:14px; font-weight:bold; cursor:pointer;">' + d + '</button>';
+    }
+
+    var html = '<div class="module-header"><div class="module-progress">📖 阅读真题</div></div>';
+    // 天数选择
+    html += '<div style="padding:10px; background:#f0f7ff; border-radius:10px; margin-bottom:12px;">';
+    html += '<div style="font-size:13px; color:#666; margin-bottom:8px;">📅 选择天数（每天5-7题，轻松完成）：</div>';
+    html += '<div style="display:flex; flex-wrap:wrap; gap:5px;">' + dayButtons + '</div>';
     html += '</div>';
-    html += '<div style="display:grid; gap:10px;">';
+
+    // 当天任务
+    var dayTask = this.getReadingDayTask(day);
+    html += '<div style="padding:14px; border-radius:12px; background:#fff; border:2px solid #e8e8e8;">';
+    html += '<div style="font-size:15px; font-weight:bold;">📖 Day ' + day + '：' + dayTask.title + '</div>';
+    html += '<div style="font-size:13px; color:#888; margin-top:4px;">' + dayTask.desc + ' · ' + dayTask.qCount + '题 · 约5分钟</div>';
+    html += '<button class="btn-primary" onclick="App.startReadingDay(' + day + ')" style="margin-top:10px; width:100%; font-size:16px; padding:12px;">开始做题 ▶️</button>';
+    html += '</div>';
+
+    // 也可以完整做一套
+    html += '<div style="margin-top:15px; padding:10px; background:#fafafa; border-radius:10px;">';
+    html += '<div style="font-size:13px; color:#888; margin-bottom:8px;">💪 想挑战更多？完整做一套：</div>';
+    html += '<div style="display:grid; gap:8px;">';
     for (var i = 0; i < KET_READING.length; i++) {
       var test = KET_READING[i];
       var qCount = test.parts.reduce(function(s, p) { return s + p.questions.length; }, 0);
-      html += '<div style="padding:14px; border-radius:12px; background:#fff; border:2px solid #e8e8e8; cursor:pointer;" onclick="App.startReadingTest(' + test.id + ')">';
-      html += '<div style="display:flex; justify-content:space-between; align-items:center;">';
-      html += '<div><div style="font-size:15px; font-weight:bold;">📖 ' + test.title + '</div>';
-      html += '<div style="font-size:12px; color:#888; margin-top:3px;">Part 1+2+3 · ' + qCount + '题</div></div>';
-      html += '<div style="font-size:22px;">▶️</div>';
-      html += '</div></div>';
+      html += '<div style="padding:10px; border-radius:10px; background:#fff; border:1px solid #e0e0e0; cursor:pointer; font-size:14px;" onclick="App.startReadingTest(' + test.id + ')">📖 ' + test.title + ' · ' + qCount + '题</div>';
     }
-    html += '</div>';
-    html += '<div style="text-align:center; margin-top:15px;"><button class="btn-secondary" onclick="App.showView(\'home\')">🏠 返回首页</button></div>';
+    html += '</div></div>';
+
+    html += '<div style="text-align:center; margin-top:12px;"><button class="btn-secondary" onclick="App.showView(\'home\')">🏠 返回首页</button></div>';
     el.innerHTML = html;
+  },
+
+  selectReadingDay(d) {
+    this.selectedReadingDay = d;
+    this.startReading();
+  },
+
+  // 把6套×3部分=18个Part分配到15天
+  getReadingDayTask(day) {
+    // 所有Part列表
+    var allParts = [];
+    for (var i = 0; i < KET_READING.length; i++) {
+      var test = KET_READING[i];
+      for (var j = 0; j < test.parts.length; j++) {
+        allParts.push({ testId: test.id, partIndex: j, part: test.parts[j], testTitle: test.title });
+      }
+    }
+    // 18个Part分15天：前12天每天1个Part，后3天每天2个Part
+    // 简单方案：每天1个Part，15天做15个Part，剩3个Part作为 bonus
+    var partIdx = (day - 1) % allParts.length;
+    if (partIdx >= 15) partIdx = partIdx % 15; // 安全限制
+    var item = allParts[partIdx];
+    if (!item) { // 万一越界，取第一个
+      item = allParts[0];
+    }
+    return {
+      title: item.testTitle + ' · ' + item.part.name,
+      desc: item.part.instruction,
+      qCount: item.part.questions.length,
+      testId: item.testId,
+      partIndex: item.partIndex
+    };
+  },
+
+  startReadingDay(day) {
+    var task = this.getReadingDayTask(day);
+    var test = KET_READING.find(t => t.id === task.testId);
+    if (!test) return;
+    // 只取对应的Part
+    var singlePart = test.parts[task.partIndex];
+    this.readingState = {
+      test: { title: 'Day ' + day + ' ' + test.title + ' · ' + singlePart.name, parts: [singlePart] },
+      userAnswers: {},
+      correct: 0,
+      total: singlePart.questions.length,
+      startTime: Date.now()
+    };
+    this.renderReadingAll();
   },
 
   startReadingTest(testId) {
