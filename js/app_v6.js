@@ -135,7 +135,7 @@ const App = {
 
     // 生成天数选择按钮
     var dayButtons = '';
-    for (var d = 1; d <= 15; d++) {
+    for (var d = 1; d <= 30; d++) {
       var isCurrent = d === day;
       var isLearned = d < currentDay;
       var bg = isCurrent ? '#1890ff' : (isLearned ? '#e8f5e9' : '#f5f5f5');
@@ -173,15 +173,19 @@ const App = {
 
   startWordMemorize() {
     const day = this.selectedWordDay || Storage.getCurrentWordDay();
-    const dayWords = KET_WORDS.filter(w => w.day === day);
-    const wordGlobalIndices = dayWords.map(w => KET_WORDS.indexOf(w) + 1);
+    // Day 1-15用第一批，Day 16-30用第二批
+    var allWords = (typeof KET_WORDS_BATCH2 !== 'undefined') ? KET_WORDS.concat(KET_WORDS_BATCH2) : KET_WORDS;
+    const dayWords = allWords.filter(w => w.day === day);
+    const wordGlobalIndices = dayWords.map(w => allWords.indexOf(w) + 1);
     this.wordState = { index: 0, words: dayWords, globalIndices: wordGlobalIndices, mode: 'select', correct: 0, total: dayWords.length, startTime: Date.now() };
     this.renderWordQuestion();
   },
 
   startWordExam() {
     const day = this.selectedWordDay || Storage.getCurrentWordDay();
-    const dayQuestions = KET_WORD_QUESTIONS.find(q => q.day === day);
+    // Day 1-15用第一批，Day 16-30用第二批
+    var allQuestions = (typeof KET_WORD_QUESTIONS_BATCH2 !== 'undefined') ? KET_WORD_QUESTIONS.concat(KET_WORD_QUESTIONS_BATCH2) : KET_WORD_QUESTIONS;
+    const dayQuestions = allQuestions.find(q => q.day === day);
     if (!dayQuestions) {
       const el = document.getElementById('view-words');
       el.innerHTML = '<div style="text-align:center; padding:40px;"><p>暂无Day ' + day + '的词汇真题</p><button class="btn-secondary" onclick="App.startWords()">← 返回</button></div>';
@@ -325,7 +329,8 @@ const App = {
 
     if (this.wordState.mode === 'select') {
       // Generate 4 options including the correct translation
-      const otherTranslations = KET_WORDS
+      var allWordsForOptions = (typeof KET_WORDS_BATCH2 !== 'undefined') ? KET_WORDS.concat(KET_WORDS_BATCH2) : KET_WORDS;
+      const otherTranslations = allWordsForOptions
         .filter(w => w.word !== word.word)
         .map(w => w.translation)
         .sort(() => Math.random() - 0.5)
@@ -484,7 +489,7 @@ const App = {
 
     // 生成天数选择按钮
     var dayButtons = '';
-    for (var d = 1; d <= 15; d++) {
+    for (var d = 1; d <= 30; d++) {
       var isCurrent = d === day;
       var isLearned = d < currentDay;
       var bg = isCurrent ? '#1890ff' : (isLearned ? '#e8f5e9' : '#f5f5f5');
@@ -511,8 +516,9 @@ const App = {
     html += '<div style="margin-top:15px; padding:10px; background:#fafafa; border-radius:10px;">';
     html += '<div style="font-size:13px; color:#888; margin-bottom:8px;">💪 想挑战更多？完整做一套：</div>';
     html += '<div style="display:grid; gap:8px;">';
-    for (var i = 0; i < KET_READING.length; i++) {
-      var test = KET_READING[i];
+    var allReadingList = (typeof KET_READING_BATCH2 !== 'undefined') ? KET_READING.concat(KET_READING_BATCH2) : KET_READING;
+    for (var i = 0; i < allReadingList.length; i++) {
+      var test = allReadingList[i];
       var qCount = test.parts.reduce(function(s, p) { return s + p.questions.length; }, 0);
       html += '<div style="padding:10px; border-radius:10px; background:#fff; border:1px solid #e0e0e0; cursor:pointer; font-size:14px;" onclick="App.startReadingTest(' + test.id + ')">📖 ' + test.title + ' · ' + qCount + '题</div>';
     }
@@ -529,22 +535,19 @@ const App = {
 
   // 把6套×3部分=18个Part分配到15天
   getReadingDayTask(day) {
-    // 所有Part列表
+    // 合并第一批和第二批阅读
+    var allReading = (typeof KET_READING_BATCH2 !== 'undefined') ? KET_READING.concat(KET_READING_BATCH2) : KET_READING;
     var allParts = [];
-    for (var i = 0; i < KET_READING.length; i++) {
-      var test = KET_READING[i];
+    for (var i = 0; i < allReading.length; i++) {
+      var test = allReading[i];
       for (var j = 0; j < test.parts.length; j++) {
         allParts.push({ testId: test.id, partIndex: j, part: test.parts[j], testTitle: test.title });
       }
     }
-    // 18个Part分15天：前12天每天1个Part，后3天每天2个Part
-    // 简单方案：每天1个Part，15天做15个Part，剩3个Part作为 bonus
+    // 36个Part分30天，每天1个Part
     var partIdx = (day - 1) % allParts.length;
-    if (partIdx >= 15) partIdx = partIdx % 15; // 安全限制
     var item = allParts[partIdx];
-    if (!item) { // 万一越界，取第一个
-      item = allParts[0];
-    }
+    if (!item) { item = allParts[0]; }
     return {
       title: item.testTitle + ' · ' + item.part.name,
       desc: item.part.instruction,
@@ -556,7 +559,8 @@ const App = {
 
   startReadingDay(day) {
     var task = this.getReadingDayTask(day);
-    var test = KET_READING.find(t => t.id === task.testId);
+    var allReading = (typeof KET_READING_BATCH2 !== 'undefined') ? KET_READING.concat(KET_READING_BATCH2) : KET_READING;
+    var test = allReading.find(t => t.id === task.testId);
     if (!test) return;
     // 只取对应的Part
     var singlePart = test.parts[task.partIndex];
@@ -571,7 +575,8 @@ const App = {
   },
 
   startReadingTest(testId) {
-    const test = KET_READING.find(t => t.id === testId);
+    var allReadingFind = (typeof KET_READING_BATCH2 !== 'undefined') ? KET_READING.concat(KET_READING_BATCH2) : KET_READING;
+    const test = allReadingFind.find(t => t.id === testId);
     if (!test) return;
     this.readingState = { test, userAnswers: {}, correct: 0, total: test.parts.reduce((s, p) => s + p.questions.length, 0), startTime: Date.now() };
     this.renderReadingAll();
@@ -1268,7 +1273,6 @@ const App = {
         <p>请输入密码查看学习数据</p>
         <input type="password" class="login-input" id="parent-password" placeholder="请输入密码" autocomplete="off" />
         <button class="btn-primary btn-big" onclick="App.checkParentPassword()">进入</button>
-        <p class="login-hint">默认密码：8888</p>
       </div>
     `;
     setTimeout(() => {
