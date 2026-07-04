@@ -679,7 +679,7 @@ const App = {
         '</audio>' +
         '<div class="listening-controls">' +
           '<button class="btn-play" onclick="App.playListening(' + item.id + ')">▶️ 播放听力</button>' +
-          '<button class="btn-play" onclick="App.playListening(' + item.id + ', true)">🐢 慢速播放</button>' +
+
           '<button class="btn-small" onclick="App.stopListening()">⏹️ 停止</button>' +
         '</div>' +
         '<div style="margin:15px 0;">' + questionsHtml + '</div>' +
