@@ -18,6 +18,60 @@
     parentUnlocked: false
   };
 
+  // =================== 内置参考答案（家长拍摄录入）===================
+  var BUILT_IN_ANSWERS = {
+    // 第一单元 观察简单组合体
+    'math_1': [
+      '1.（课本学习内容）',
+      '2. 上、左、前',
+      '3.(1)A D  (2)C  (3)B',
+      '4. 从前面看、从上面看、从左面看（画图题）'
+    ],
+    'math_2': [
+      '知识点：相同、不同；相同、不同',
+      '1.(1)②③  (2)①②  (3)图形题',
+      '2.(1)C  (2)B',
+      '3.(1)①  (2)②④⑥  (3)①③  (4)③⑤',
+      '4. 从（前）面看、从（左）面看（画图题）'
+    ],
+    // 第二单元 小数乘法
+    'math_3': [
+      '1. 48  4.8  548  5.48（竖式略）',
+      '2. D',
+      '3. 14.8×4=59.2(元)；14.8×6=88.8(元)；88.8<100，够买6份'
+    ],
+    'math_4': [
+      '1.(1) 39 10 1.95 100  (2) 两 一 2.142 三',
+      '2. 3.12  10.92  5.824（竖式略）',
+      '3. 4680 4680 46.8 46.8 4.68 4.68',
+      '4. 4.8×2.85=13.68(m²)',
+      '5.(1)发钗长度 (2)1.6×2.1=3.36(dm) 3.36−1.6=1.76(dm)'
+    ],
+    'math_5': [
+      '1. 0.392  0.039  0.0054（竖式略）',
+      '2.(1) 两 两 0.019 四  (2) 三 四  (3) 1.654 1.645',
+      '3. 0.7  3.11  0.07（竖式略）',
+      '4. 1.5×1.4=2.1(m)，牦牛体长2.1m'
+    ]
+  };
+
+  function getAnswerKey(subject, lessonId) {
+    return subject + '_' + lessonId;
+  }
+
+  function getBuiltInAnswers(subject, lessonId) {
+    var key = getAnswerKey(subject, lessonId);
+    var builtIn = BUILT_IN_ANSWERS[key];
+    if (!builtIn) return null;
+    return {
+      subject: subject,
+      lessonId: lessonId,
+      lessonName: '',
+      answers: builtIn.map(function(text) { return { answer: text }; }),
+      updatedAt: 'built-in'
+    };
+  }
+
   // =================== 科目配置 ===================
   var SUBJECTS = {
     chinese: { name: '语文', icon: '📖', sub: '部编版五年级上册（2026秋新版）' },
@@ -240,7 +294,9 @@
       area.innerHTML = '';
       return;
     }
+    // 先查localStorage，再查内置答案
     var answer = Storage.getAnswers(state.selectedSubject, state.selectedLessonId);
+    if (!answer) answer = getBuiltInAnswers(state.selectedSubject, state.selectedLessonId);
     var html = '';
     if (answer && answer.answers) {
       html += '<div class="card answer-hint-card">';
@@ -288,6 +344,7 @@
 
     setTimeout(function() {
       var referenceAnswer = Storage.getAnswers(state.selectedSubject, state.selectedLessonId);
+      if (!referenceAnswer) referenceAnswer = getBuiltInAnswers(state.selectedSubject, state.selectedLessonId);
       var result;
       if (referenceAnswer && referenceAnswer.answers && referenceAnswer.answers.length > 0) {
         result = { mode: 'manual', referenceAnswers: referenceAnswer.answers, lessonName: lessonName };
@@ -516,6 +573,23 @@
     // 已录入列表
     html += '<div class="section-title">已录入的答案</div>';
     var allAnswers = Storage.getAllAnswers();
+    // 合并内置答案
+    Object.keys(BUILT_IN_ANSWERS).forEach(function(key) {
+      if (!allAnswers[key]) {
+        var parts = key.split('_');
+        var subj = parts[0];
+        var lid = parseInt(parts[1]);
+        var lessons = LESSONS[subj] || [];
+        var lesson = lessons.find(function(l) { return l.id === lid; });
+        allAnswers[key] = {
+          subject: subj,
+          lessonId: lid,
+          lessonName: lesson ? lesson.name : '',
+          answers: BUILT_IN_ANSWERS[key].map(function(t) { return { answer: t }; }),
+          updatedAt: 'built-in'
+        };
+      }
+    });
     var keys = Object.keys(allAnswers);
     if (keys.length === 0) {
       html += '<div class="card empty-hint"><div class="empty-icon">📋</div><div>还没有录入答案</div></div>';
@@ -527,7 +601,7 @@
         html += '<div class="answer-list-header">';
         html += '<span class="answer-list-title">' + conf.icon + ' ' + conf.name + ' · ' + escapeHtml(a.lessonName || '') + '</span>';
         html += '</div>';
-        html += '<div class="answer-list-count">共 ' + (a.answers ? a.answers.length : 0) + ' 题</div>';
+        html += '<div class="answer-list-count">共 ' + (a.answers ? a.answers.length : 0) + ' 题' + (a.updatedAt === 'built-in' ? ' · 📦 内置' : '') + '</div>';
         html += '<div class="answer-list-actions">';
         html += '<button class="btn btn-secondary btn-small" onclick="App.editAnswer(\'' + a.subject + '\', ' + a.lessonId + ')">✏️ 编辑</button>';
         html += '<button class="btn btn-danger btn-small" onclick="App.deleteAnswer(\'' + a.subject + '\', ' + a.lessonId + ')">🗑️ 删除</button>';
