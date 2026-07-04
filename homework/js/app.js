@@ -1,5 +1,9 @@
 /**
- * 学习打卡·AI批改 - 核心应用
+ * 学习打卡·AI批改 - 核心应用 v2
+ * 2026-07-04 完善版
+ * - 三科目（语文/数学/英语）完整支持
+ * - 2026秋新版教材目录
+ * - 拍照→选课→批改→记录 全流程
  */
 (function() {
   'use strict';
@@ -10,10 +14,15 @@
     selectedSubject: 'chinese',
     selectedLessonId: null,
     selectedLessonName: '',
-    capturedImage: null,
     capturedImageBase64: null,
-    parentUnlocked: false,
-    editingAnswerKey: null
+    parentUnlocked: false
+  };
+
+  // =================== 科目配置 ===================
+  var SUBJECTS = {
+    chinese: { name: '语文', icon: '📖', sub: '部编版五年级上册（2026秋新版）' },
+    math: { name: '数学', icon: '🔢', sub: '人教版五年级上册（2026秋新版）' },
+    english: { name: '英语', icon: '🔤', sub: '人教精通版五年级上册' }
   };
 
   // =================== 鼓励语 ===================
@@ -35,29 +44,16 @@
   // =================== 视图切换 ===================
   function switchView(viewName) {
     state.currentView = viewName;
-    var views = document.querySelectorAll('.view');
-    views.forEach(function(v) {
-      v.classList.remove('active');
-    });
+    document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
     var target = document.getElementById('view-' + viewName);
-    if (target) {
-      target.classList.add('active');
-    }
-    // 更新底部导航
-    var tabs = document.querySelectorAll('.tab-item');
-    tabs.forEach(function(t) {
-      t.classList.remove('active');
-    });
+    if (target) target.classList.add('active');
+    document.querySelectorAll('.tab-item').forEach(function(t) { t.classList.remove('active'); });
     var tab = document.querySelector('.tab-item[data-view="' + viewName + '"]');
-    if (tab) {
-      tab.classList.add('active');
-    }
-    // 渲染对应视图
+    if (tab) tab.classList.add('active');
     if (viewName === 'home') renderHome();
     if (viewName === 'camera') renderCamera();
     if (viewName === 'records') renderRecords();
     if (viewName === 'answers') renderAnswers();
-    // 滚动到顶部
     window.scrollTo(0, 0);
   }
 
@@ -67,33 +63,31 @@
     var dateStr = today.getFullYear() + '年' + (today.getMonth() + 1) + '月' + today.getDate() + '日';
     var weekDays = ['日', '一', '二', '三', '四', '五', '六'];
     var weekDay = '星期' + weekDays[today.getDay()];
-
-    var chineseDone = Storage.hasCheckedIn('chinese');
-    var mathDone = Storage.hasCheckedIn('math');
-    var englishDone = Storage.hasCheckedIn('english');
-    var streak = Storage.getStreak();
-    var stats = Storage.getStats();
-
-    // 周末检测
-    var dayOfWeek = new Date().getDay(); // 0=周日, 6=周六
+    var dayOfWeek = today.getDay();
     var isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
 
+    var streak = Storage.getStreak();
+    var stats = Storage.getStats();
+    var todayCheckins = Storage.getTodayCheckins();
+
     var html = '';
+
     // 周末提示
     if (isWeekend) {
-      html += '<div class="card" style="background:linear-gradient(135deg, #fff9c4, #fff3e0); text-align:center; padding:30px 20px;">';
+      html += '<div class="card weekend-card">';
       html += '<div style="font-size:48px; margin-bottom:10px;">🎉</div>';
       html += '<div style="font-size:20px; font-weight:bold; color:#e65100;">周末休息！</div>';
       html += '<div style="font-size:14px; color:#999; margin-top:8px;">好好玩吧～周一继续加油！💪</div>';
       html += '</div>';
     }
-    // 顶部日期卡片
+
+    // 日期+连续打卡
     html += '<div class="card date-card">';
     html += '<div class="date-text">📅 ' + dateStr + ' ' + weekDay + '</div>';
     html += '<div class="streak-badge">🔥 连续打卡 <span class="streak-num">' + streak + '</span> 天</div>';
     html += '</div>';
 
-    // 总体统计
+    // 统计
     if (stats.totalDays > 0) {
       html += '<div class="card stats-card">';
       html += '<div class="stats-title">📊 累计统计</div>';
@@ -105,35 +99,30 @@
       html += '</div>';
     }
 
-    // 语文入口
-    html += '<div class="card subject-card ' + (chineseDone ? 'done' : '') + '" onclick="App.selectSubjectFromHome(\'chinese\')">';
-    html += '<div class="subject-icon">📖</div>';
-    html += '<div class="subject-info">';
-    html += '<div class="subject-name">语文</div>';
-    html += '<div class="subject-sub">部编版五年级上册</div>';
+    // 今日进度
+    var doneCount = todayCheckins.length;
+    var totalSubjects = 3;
+    html += '<div class="card today-progress-card">';
+    html += '<div class="progress-title">📝 今日进度 ' + doneCount + '/' + totalSubjects + '</div>';
+    html += '<div class="progress-bar-wrap">';
+    var pct = Math.round(doneCount / totalSubjects * 100);
+    html += '<div class="progress-bar" style="width:' + pct + '%"></div>';
     html += '</div>';
-    html += '<div class="subject-status">' + (chineseDone ? '✅ 已完成' : '❌ 未打卡') + '</div>';
-    html += '</div>';
-
-    // 数学入口
-    html += '<div class="card subject-card ' + (mathDone ? 'done' : '') + '" onclick="App.selectSubjectFromHome(\'math\')">';
-    html += '<div class="subject-icon">🔢</div>';
-    html += '<div class="subject-info">';
-    html += '<div class="subject-name">数学</div>';
-    html += '<div class="subject-sub">人教版五年级上册</div>';
-    html += '</div>';
-    html += '<div class="subject-status">' + (mathDone ? '✅ 已完成' : '❌ 未打卡') + '</div>';
     html += '</div>';
 
-    // 英语入口
-    html += '<div class="card subject-card ' + (englishDone ? 'done' : '') + '" onclick="App.selectSubjectFromHome(\'english\')">';
-    html += '<div class="subject-icon">🔤</div>';
-    html += '<div class="subject-info">';
-    html += '<div class="subject-name">英语</div>';
-    html += '<div class="subject-sub">人教精通版五年级上册</div>';
-    html += '</div>';
-    html += '<div class="subject-status">' + (englishDone ? '✅ 已完成' : '❌ 未打卡') + '</div>';
-    html += '</div>';
+    // 三个科目入口
+    ['chinese', 'math', 'english'].forEach(function(subj) {
+      var conf = SUBJECTS[subj];
+      var done = todayCheckins.some(function(r) { return r.subject === subj; });
+      html += '<div class="card subject-card ' + (done ? 'done' : '') + '" onclick="App.selectSubjectFromHome(\'' + subj + '\')">';
+      html += '<div class="subject-icon">' + conf.icon + '</div>';
+      html += '<div class="subject-info">';
+      html += '<div class="subject-name">' + conf.name + '</div>';
+      html += '<div class="subject-sub">' + conf.sub + '</div>';
+      html += '</div>';
+      html += '<div class="subject-status">' + (done ? '✅' : '❌') + '</div>';
+      html += '</div>';
+    });
 
     // 鼓励语
     html += '<div class="card encourage-card">';
@@ -147,11 +136,13 @@
   function renderCamera() {
     var html = '';
 
-    // 科目选择
+    // 科目选择（三科目）
     html += '<div class="section-title">选择科目</div>';
     html += '<div class="subject-tabs">';
-    html += '<button class="subject-tab ' + (state.selectedSubject === 'chinese' ? 'active' : '') + '" onclick="App.selectSubject(\'chinese\')">📖 语文</button>';
-    html += '<button class="subject-tab ' + (state.selectedSubject === 'math' ? 'active' : '') + '" onclick="App.selectSubject(\'math\')">🔢 数学</button>';
+    ['chinese', 'math', 'english'].forEach(function(subj) {
+      var conf = SUBJECTS[subj];
+      html += '<button class="subject-tab ' + (state.selectedSubject === subj ? 'active' : '') + '" onclick="App.selectSubject(\'' + subj + '\')">' + conf.icon + ' ' + conf.name + '</button>';
+    });
     html += '</div>';
 
     // 课时选择
@@ -159,16 +150,17 @@
     var lessons = LESSONS[state.selectedSubject] || [];
     html += '<select class="lesson-select" id="lesson-select">';
     html += '<option value="">请选择...</option>';
+    // 按单元分组
+    var currentUnit = '';
     lessons.forEach(function(l) {
-      var sel = state.selectedLessonId === l.id ? ' selected' : '';
-      html += '<option value="' + l.id + '" data-name="' + l.name + '"' + sel + '>' + l.name + '</option>';
+      html += '<option value="' + l.id + '" data-name="' + l.name + '">' + l.name + '</option>';
     });
     html += '</select>';
 
-    // 自定义课时输入
-    html += '<input type="text" class="custom-lesson" id="custom-lesson" placeholder="或输入自定义课时名称" value="">';
+    // 自定义课时
+    html += '<input type="text" class="custom-lesson" id="custom-lesson" placeholder="或输入自定义内容（如：复习卷子）">';
 
-    // 拍照区域
+    // 拍照
     html += '<div class="section-title">拍照上传作业</div>';
     html += '<div class="camera-area" id="camera-area">';
     html += '<label for="file-input" class="camera-label">';
@@ -180,26 +172,24 @@
     html += '<input type="file" id="file-input" accept="image/*" capture="environment" style="display:none">';
     html += '</div>';
 
-    // 图片预览
+    // 预览
     html += '<div class="image-preview" id="image-preview" style="display:none">';
     html += '<img id="preview-img" src="" alt="作业预览">';
     html += '<button class="btn btn-secondary btn-small" onclick="App.clearImage()">重新拍照</button>';
     html += '</div>';
 
-    // 参考答案显示
+    // 参考答案提示
     html += '<div id="reference-answer-area"></div>';
 
-    // 提交按钮
+    // 提交
     html += '<button class="btn btn-primary btn-large" id="submit-btn" onclick="App.submitHomework()" style="display:none">';
     html += '✨ 开始AI批改';
     html += '</button>';
 
-    // 批改结果
+    // 结果
     html += '<div id="result-area"></div>';
 
     document.getElementById('camera-content').innerHTML = html;
-
-    // 绑定事件
     bindCameraEvents();
     updateReferenceAnswer();
   }
@@ -260,7 +250,7 @@
     } else {
       html += '<div class="card answer-hint-card warning">';
       html += '<div class="answer-hint-title">⚠️ 还没有参考答案</div>';
-      html += '<div class="answer-hint-sub">请家长先在"答案管理"中录入参考答案</div>';
+      html += '<div class="answer-hint-sub">请家长先在"答案管理"中录入</div>';
       html += '<div class="answer-hint-sub">也可以直接拍照后手动批改</div>';
       html += '</div>';
     }
@@ -268,7 +258,7 @@
   }
 
   // =================== 批改逻辑 ===================
-  async function submitHomework() {
+  function submitHomework() {
     var lessonSelect = document.getElementById('lesson-select');
     var customLesson = document.getElementById('custom-lesson');
     var lessonName = '';
@@ -291,52 +281,23 @@
 
     var submitBtn = document.getElementById('submit-btn');
     submitBtn.disabled = true;
-    submitBtn.textContent = '⏳ AI批改中...';
+    submitBtn.textContent = '⏳ 批改中...';
 
     var resultArea = document.getElementById('result-area');
-    resultArea.innerHTML = '<div class="loading-card"><div class="loading-spinner"></div><div class="loading-text">AI正在识别作业...</div></div>';
+    resultArea.innerHTML = '<div class="loading-card"><div class="loading-spinner"></div><div class="loading-text">正在准备批改...</div></div>';
 
-    try {
-      var result = await analyzeHomeworkImage(state.capturedImageBase64, state.selectedSubject, state.selectedLessonId, lessonName);
+    setTimeout(function() {
+      var referenceAnswer = Storage.getAnswers(state.selectedSubject, state.selectedLessonId);
+      var result;
+      if (referenceAnswer && referenceAnswer.answers && referenceAnswer.answers.length > 0) {
+        result = { mode: 'manual', referenceAnswers: referenceAnswer.answers, lessonName: lessonName };
+      } else {
+        result = { mode: 'no_reference', lessonName: lessonName };
+      }
       displayResult(result, lessonName);
-    } catch (err) {
-      console.error('批改失败:', err);
-      resultArea.innerHTML = '<div class="card error-card"><div>😅 批改出错了，请重试</div><div class="error-detail">' + (err.message || '未知错误') + '</div></div>';
-    } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = '✨ 开始AI批改';
-    }
-  }
-
-  /**
-   * AI识别函数（占位）
-   * 后续接入真实图片识别API
-   */
-  async function analyzeHomeworkImage(imageBase64, subject, lessonId, lessonName) {
-    var referenceAnswer = Storage.getAnswers(subject, lessonId);
-
-    // 模拟AI处理延迟
-    await new Promise(function(resolve) {
-      setTimeout(resolve, 1500);
-    });
-
-    // 如果有参考答案，进入手动批改模式
-    if (referenceAnswer && referenceAnswer.answers && referenceAnswer.answers.length > 0) {
-      // 返回需要手动确认的结果
-      return {
-        mode: 'manual',
-        referenceAnswers: referenceAnswer.answers,
-        lessonName: lessonName,
-        imageBase64: imageBase64
-      };
-    }
-
-    // 没有参考答案，返回手动输入模式
-    return {
-      mode: 'no_reference',
-      lessonName: lessonName,
-      imageBase64: imageBase64
-    };
+    }, 800);
   }
 
   function displayResult(result, lessonName) {
@@ -344,13 +305,12 @@
     var html = '';
 
     if (result.mode === 'manual') {
-      // 有参考答案，逐题确认
       html += '<div class="card result-card">';
       html += '<div class="result-title">📝 逐题批改</div>';
-      html += '<div class="result-sub">对比参考答案，点击每题对/错</div>';
+      html += '<div class="result-sub">对照参考答案，点击每题对/错</div>';
       html += '<div id="manual-grading-list">';
       result.referenceAnswers.forEach(function(ans, i) {
-        html += '<div class="grading-item" data-index="' + i + '">';
+        html += '<div class="grading-item unmarked" data-index="' + i + '">';
         html += '<div class="grading-q">第' + (i + 1) + '题</div>';
         html += '<div class="grading-a">参考答案：' + escapeHtml(ans.answer || ans) + '</div>';
         html += '<div class="grading-btns">';
@@ -363,10 +323,9 @@
       html += '<button class="btn btn-primary btn-large" onclick="App.finishGrading(\'' + escapeAttr(lessonName) + '\', ' + result.referenceAnswers.length + ')" id="finish-grading-btn" disabled>完成批改</button>';
       html += '</div>';
     } else if (result.mode === 'no_reference') {
-      // 没有参考答案，手动输入结果
       html += '<div class="card result-card">';
       html += '<div class="result-title">✏️ 手动批改</div>';
-      html += '<div class="result-sub">没有找到参考答案，请手动输入批改结果</div>';
+      html += '<div class="result-sub">没有参考答案，请输入批改结果</div>';
       html += '<div class="manual-input-row">';
       html += '<label>总题数：</label>';
       html += '<input type="number" id="manual-total" min="0" value="10" class="manual-input">';
@@ -375,17 +334,13 @@
       html += '<label>正确数：</label>';
       html += '<input type="number" id="manual-correct" min="0" value="8" class="manual-input">';
       html += '</div>';
-      html += '<div class="manual-input-row">';
-      html += '<label>错题说明：</label>';
-      html += '</div>';
+      html += '<div class="form-label">错题说明（可选）：</div>';
       html += '<textarea id="manual-notes" class="manual-textarea" placeholder="记录错题和需要注意的地方..."></textarea>';
       html += '<button class="btn btn-primary btn-large" onclick="App.submitManualResult(\'' + escapeAttr(lessonName) + '\')">完成批改</button>';
       html += '</div>';
     }
 
     resultArea.innerHTML = html;
-
-    // 初始化批改状态
     if (result.mode === 'manual') {
       App._gradingState = {};
     }
@@ -399,35 +354,19 @@
       item.classList.remove('unmarked', 'marked-correct', 'marked-wrong');
       item.classList.add(isCorrect ? 'marked-correct' : 'marked-wrong');
     }
-    // 检查是否全部完成
     var total = document.querySelectorAll('.grading-item').length;
     var marked = Object.keys(App._gradingState).length;
     var finishBtn = document.getElementById('finish-grading-btn');
-    if (finishBtn) {
-      finishBtn.disabled = marked < total;
-    }
+    if (finishBtn) finishBtn.disabled = marked < total;
   }
 
   function finishGrading(lessonName, total) {
-    var correct = 0;
-    var wrong = 0;
-    var details = [];
+    var correct = 0, wrong = 0, details = [];
     for (var i = 0; i < total; i++) {
-      if (App._gradingState[i]) {
-        correct++;
-        details.push({ index: i, correct: true });
-      } else {
-        wrong++;
-        details.push({ index: i, correct: false });
-      }
+      if (App._gradingState[i]) { correct++; details.push({ index: i, correct: true }); }
+      else { wrong++; details.push({ index: i, correct: false }); }
     }
-    var result = {
-      total: total,
-      correct: correct,
-      wrong: wrong,
-      details: details
-    };
-    saveAndShowResult(lessonName, result);
+    saveAndShowResult(lessonName, { total: total, correct: correct, wrong: wrong, details: details });
   }
 
   function submitManualResult(lessonName) {
@@ -435,21 +374,11 @@
     var correct = parseInt(document.getElementById('manual-correct').value) || 0;
     var notes = document.getElementById('manual-notes').value;
     if (correct > total) correct = total;
-    var result = {
-      total: total,
-      correct: correct,
-      wrong: total - correct,
-      details: [],
-      notes: notes
-    };
-    saveAndShowResult(lessonName, result);
+    saveAndShowResult(lessonName, { total: total, correct: correct, wrong: total - correct, details: [], notes: notes });
   }
 
   function saveAndShowResult(lessonName, result) {
-    var subject = state.selectedSubject;
-    var lessonId = state.selectedLessonId || 0;
-    Storage.recordCheckin(subject, lessonId, lessonName, result);
-
+    Storage.recordCheckin(state.selectedSubject, state.selectedLessonId || 0, lessonName, result);
     var resultArea = document.getElementById('result-area');
     var rate = result.total > 0 ? Math.round(result.correct / result.total * 100) : 0;
     var isGood = rate >= 80;
@@ -474,12 +403,8 @@
     html += '<button class="btn btn-primary btn-large" onclick="App.goHome()">✅ 完成，返回首页</button>';
 
     resultArea.innerHTML = html;
-
-    // 隐藏提交按钮
     var submitBtn = document.getElementById('submit-btn');
     if (submitBtn) submitBtn.style.display = 'none';
-
-    // 滚动到结果
     resultArea.scrollIntoView({ behavior: 'smooth' });
   }
 
@@ -487,30 +412,27 @@
   function renderRecords() {
     var history = Storage.getCheckinHistory(7);
     var stats = Storage.getStats();
-
     var html = '';
 
-    // 统计概览
     html += '<div class="card stats-overview">';
     html += '<div class="stats-overview-title">📊 学习统计</div>';
     html += '<div class="stats-row">';
     html += '<div class="stats-item"><div class="stats-num">' + stats.totalDays + '</div><div class="stats-label">打卡天数</div></div>';
     html += '<div class="stats-item"><div class="stats-num">' + stats.totalQuestions + '</div><div class="stats-label">总题数</div></div>';
-    html += '<div class="stats-item"><div class="stats-num">' + stats.totalCorrect + '</div><div class="stats-label">答对题数</div></div>';
+    html += '<div class="stats-item"><div class="stats-num">' + stats.totalCorrect + '</div><div class="stats-label">答对</div></div>';
     html += '<div class="stats-item"><div class="stats-num">' + stats.accuracy + '%</div><div class="stats-label">正确率</div></div>';
     html += '</div>';
     html += '</div>';
 
-    // 最近7天
     html += '<div class="section-title">最近7天记录</div>';
     var hasAny = false;
     history.forEach(function(day) {
-      var dateParts = day.date.split('-');
-      var displayDate = parseInt(dateParts[1]) + '月' + parseInt(dateParts[2]) + '日';
+      var parts = day.date.split('-');
+      var displayDate = parseInt(parts[1]) + '月' + parseInt(parts[2]) + '日';
       var today = new Date();
       var todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
       var isToday = day.date === todayStr;
-      var d = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+      var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
       var weekDays = ['日', '一', '二', '三', '四', '五', '六'];
       var weekLabel = '周' + weekDays[d.getDay()];
 
@@ -524,12 +446,11 @@
         html += '<div class="card record-day-card">';
         html += '<div class="record-date">' + displayDate + ' ' + weekLabel + (isToday ? '（今天）' : '') + '</div>';
         day.records.forEach(function(r) {
-          var subjectIcon = r.subject === 'chinese' ? '📖' : (r.subject === 'math' ? '🔢' : '🔤');
-          var subjectName = r.subject === 'chinese' ? '语文' : (r.subject === 'math' ? '数学' : '英语');
+          var conf = SUBJECTS[r.subject] || { icon: '📝', name: r.subject };
           var rate = r.total > 0 ? Math.round(r.correct / r.total * 100) : 0;
           html += '<div class="record-item">';
           html += '<div class="record-item-header">';
-          html += '<span class="record-subject">' + subjectIcon + ' ' + subjectName + '</span>';
+          html += '<span class="record-subject">' + conf.icon + ' ' + conf.name + '</span>';
           html += '<span class="record-lesson">' + escapeHtml(r.lessonName || '') + '</span>';
           html += '</div>';
           html += '<div class="record-item-score">';
@@ -565,18 +486,19 @@
       return;
     }
 
-    // 已解锁
     html += '<div class="answers-header">';
     html += '<span>📝 答案管理</span>';
     html += '<button class="btn btn-secondary btn-small" onclick="App.lockParent()">🔒 退出</button>';
     html += '</div>';
 
-    // 录入区域
+    // 录入
     html += '<div class="card answer-form-card">';
     html += '<div class="form-title">录入参考答案</div>';
     html += '<div class="subject-tabs">';
-    html += '<button class="subject-tab ' + (state.selectedSubject === 'chinese' ? 'active' : '') + '" onclick="App.selectSubject(\'chinese\')">📖 语文</button>';
-    html += '<button class="subject-tab ' + (state.selectedSubject === 'math' ? 'active' : '') + '" onclick="App.selectSubject(\'math\')">🔢 数学</button>';
+    ['chinese', 'math', 'english'].forEach(function(subj) {
+      var conf = SUBJECTS[subj];
+      html += '<button class="subject-tab ' + (state.selectedSubject === subj ? 'active' : '') + '" onclick="App.selectSubject(\'' + subj + '\')">' + conf.icon + ' ' + conf.name + '</button>';
+    });
     html += '</div>';
     var lessons = LESSONS[state.selectedSubject] || [];
     html += '<select class="lesson-select" id="answer-lesson-select">';
@@ -591,7 +513,7 @@
     html += '</div>';
     html += '<div id="answer-save-result"></div>';
 
-    // 已录入答案列表
+    // 已录入列表
     html += '<div class="section-title">已录入的答案</div>';
     var allAnswers = Storage.getAllAnswers();
     var keys = Object.keys(allAnswers);
@@ -600,11 +522,10 @@
     } else {
       keys.forEach(function(key) {
         var a = allAnswers[key];
-        var icon = a.subject === 'chinese' ? '📖' : (a.subject === 'math' ? '🔢' : '🔤');
-        var subjectName = a.subject === 'chinese' ? '语文' : '数学';
+        var conf = SUBJECTS[a.subject] || { icon: '📝', name: a.subject };
         html += '<div class="card answer-list-card">';
         html += '<div class="answer-list-header">';
-        html += '<span class="answer-list-title">' + icon + ' ' + subjectName + ' · ' + escapeHtml(a.lessonName || '') + '</span>';
+        html += '<span class="answer-list-title">' + conf.icon + ' ' + conf.name + ' · ' + escapeHtml(a.lessonName || '') + '</span>';
         html += '</div>';
         html += '<div class="answer-list-count">共 ' + (a.answers ? a.answers.length : 0) + ' 题</div>';
         html += '<div class="answer-list-actions">';
@@ -620,21 +541,14 @@
 
   function saveAnswer() {
     var lessonSelect = document.getElementById('answer-lesson-select');
-    if (!lessonSelect || !lessonSelect.value) {
-      alert('请选择课文/课时');
-      return;
-    }
+    if (!lessonSelect || !lessonSelect.value) { alert('请选择课文/课时'); return; }
     var lessonId = parseInt(lessonSelect.value);
     var lessonName = lessonSelect.selectedOptions[0].getAttribute('data-name');
     var input = document.getElementById('answer-input').value.trim();
-    if (!input) {
-      alert('请输入参考答案');
-      return;
-    }
+    if (!input) { alert('请输入参考答案'); return; }
 
-    // 解析答案：支持 "1. xxx" 或直接每行一条
     var lines = input.split('\n').filter(function(l) { return l.trim(); });
-    var answers = lines.map(function(line, i) {
+    var answers = lines.map(function(line) {
       var match = line.match(/^\d+[.、．]\s*(.*)/);
       return { answer: match ? match[1] : line };
     });
@@ -643,10 +557,7 @@
 
     var result = document.getElementById('answer-save-result');
     result.innerHTML = '<div class="card success-msg">✅ 答案已保存！共 ' + answers.length + ' 题</div>';
-    setTimeout(function() {
-      result.innerHTML = '';
-    }, 2000);
-
+    setTimeout(function() { result.innerHTML = ''; }, 2000);
     document.getElementById('answer-input').value = '';
     renderAnswers();
   }
@@ -656,14 +567,10 @@
     if (!answer) return;
     state.selectedSubject = subject;
     renderAnswers();
-    // 选中对应课时
     var lessonSelect = document.getElementById('answer-lesson-select');
     if (lessonSelect) {
       lessonSelect.value = lessonId;
-      // 填充文本框
-      var text = answer.answers.map(function(a, i) {
-        return (i + 1) + '. ' + (a.answer || a);
-      }).join('\n');
+      var text = answer.answers.map(function(a, i) { return (i + 1) + '. ' + (a.answer || a); }).join('\n');
       document.getElementById('answer-input').value = text;
     }
   }
@@ -674,14 +581,13 @@
     renderAnswers();
   }
 
-  // =================== 工具函数 ===================
+  // =================== 工具 ===================
   function escapeHtml(str) {
     if (!str) return '';
     var div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
   }
-
   function escapeAttr(str) {
     return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
   }
@@ -690,9 +596,7 @@
   window.App = {
     _gradingState: {},
     init: function() {
-      // 绑定底部导航
-      var tabs = document.querySelectorAll('.tab-item');
-      tabs.forEach(function(tab) {
+      document.querySelectorAll('.tab-item').forEach(function(tab) {
         tab.addEventListener('click', function() {
           switchView(this.getAttribute('data-view'));
         });
@@ -700,13 +604,12 @@
       switchView('home');
     },
     switchView: switchView,
-    goHome: function() {
-      switchView('home');
-    },
+    goHome: function() { switchView('home'); },
     selectSubject: function(subject) {
       state.selectedSubject = subject;
       state.selectedLessonId = null;
-      renderCamera();
+      if (state.currentView === 'camera') renderCamera();
+      else if (state.currentView === 'answers') renderAnswers();
     },
     selectSubjectFromHome: function(subject) {
       state.selectedSubject = subject;
@@ -733,16 +636,12 @@
         alert('密码错误');
       }
     },
-    lockParent: function() {
-      state.parentUnlocked = false;
-      renderAnswers();
-    },
+    lockParent: function() { state.parentUnlocked = false; renderAnswers(); },
     saveAnswer: saveAnswer,
     editAnswer: editAnswer,
     deleteAnswer: deleteAnswer
   };
 
-  // 启动
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', window.App.init);
   } else {
