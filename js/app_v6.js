@@ -124,13 +124,31 @@ const App = {
   // ============ WORDS MODULE ============
   wordState: { index: 0, words: [], mode: 'select', correct: 0, total: 0, startTime: 0 },
 
+  selectedWordDay: null,
+
   startWords() {
-    // 显示单词模块选择页面
     const el = document.getElementById('view-words');
     if (!el) return;
-    const day = Storage.getCurrentWordDay();
+    const currentDay = Storage.getCurrentWordDay();
+    if (!this.selectedWordDay) this.selectedWordDay = currentDay;
+    const day = this.selectedWordDay;
+
+    // 生成天数选择按钮
+    var dayButtons = '';
+    for (var d = 1; d <= 15; d++) {
+      var isCurrent = d === day;
+      var isLearned = d < currentDay;
+      var bg = isCurrent ? '#1890ff' : (isLearned ? '#e8f5e9' : '#f5f5f5');
+      var color = isCurrent ? '#fff' : (isLearned ? '#2e7d32' : '#999');
+      dayButtons += '<button onclick="App.selectWordDay(' + d + ')" style="width:36px; height:36px; border:none; border-radius:8px; background:' + bg + '; color:' + color + '; font-size:14px; font-weight:bold; cursor:pointer;">' + d + '</button>';
+    }
+
     el.innerHTML =
       '<div class="module-header"><div class="module-progress">📝 单词训练</div></div>' +
+      '<div style="padding:10px; background:#f0f7ff; border-radius:10px; margin-bottom:12px;">' +
+        '<div style="font-size:13px; color:#666; margin-bottom:8px;">📅 选择天数（绿色=已学，蓝色=当前）：</div>' +
+        '<div style="display:flex; flex-wrap:wrap; gap:5px;">' + dayButtons + '</div>' +
+      '</div>' +
       '<div style="display:grid; gap:10px;">' +
         '<div style="padding:14px; border-radius:12px; background:#fff; border:2px solid #e8e8e8; cursor:pointer;" onclick="App.startWordMemorize()">' +
           '<div style="display:flex; justify-content:space-between; align-items:center;">' +
@@ -148,8 +166,13 @@ const App = {
       '<div style="text-align:center; margin-top:15px;"><button class="btn-secondary" onclick="App.showView(\'home\')">🏠 返回首页</button></div>';
   },
 
+  selectWordDay(d) {
+    this.selectedWordDay = d;
+    this.startWords();
+  },
+
   startWordMemorize() {
-    const day = Storage.getCurrentWordDay();
+    const day = this.selectedWordDay || Storage.getCurrentWordDay();
     const dayWords = KET_WORDS.filter(w => w.day === day);
     const wordGlobalIndices = dayWords.map(w => KET_WORDS.indexOf(w) + 1);
     this.wordState = { index: 0, words: dayWords, globalIndices: wordGlobalIndices, mode: 'select', correct: 0, total: dayWords.length, startTime: Date.now() };
@@ -157,7 +180,7 @@ const App = {
   },
 
   startWordExam() {
-    const day = Storage.getCurrentWordDay();
+    const day = this.selectedWordDay || Storage.getCurrentWordDay();
     const dayQuestions = KET_WORD_QUESTIONS.find(q => q.day === day);
     if (!dayQuestions) {
       const el = document.getElementById('view-words');
