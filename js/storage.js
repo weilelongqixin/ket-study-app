@@ -1,5 +1,5 @@
 // Storage Module - 服务器为主，按学生ID分别存储
-const API_BASE = 'http://192.168.3.17:9090';
+const API_BASE = 'https://nine-bikes-tan.loca.lt';
 
 const Storage = {
   KEY_PREFIX: 'ket_study_',
