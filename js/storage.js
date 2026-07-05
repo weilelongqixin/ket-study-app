@@ -1,11 +1,11 @@
-// Storage Module - 服务器为主，按学生ID分别存储
-const API_BASE = 'https://new-steaks-beam.loca.lt';
+// Storage Module - Firebase云端数据库，全球同步
+const FIREBASE_URL = 'https://ket-study-default-rtdb.firebaseio.com';
 
 const Storage = {
   KEY_PREFIX: 'ket_study_',
-  _syncTimer: null,
-  _studentId: null,    // 当前学生ID
-  _studentName: '',    // 当前学生名字
+  _studentId: null,
+  _studentName: '',
+  _cache: {}, // 本地内存缓存
 
   // ===== 学生登录 =====
   setStudent(id, name) {
@@ -21,90 +21,76 @@ const Storage = {
     } catch(e) { return null; }
   },
 
-  // ===== localStorage 读写（带学生ID前缀）=====
-  _key(key) {
+  // ===== Firebase 读写 =====
+  _path(key) {
     const sid = this.getStudentId() || 'default';
-    return this.KEY_PREFIX + sid + '_' + key;
+    return `${FIREBASE_URL}/students/${sid}/${key}.json`;
   },
 
+  _studentPath() {
+    const sid = this.getStudentId() || 'default';
+    return `${FIREBASE_URL}/students/${sid}.json`;
+  },
+
+  // 从Firebase读取一个key
   get(key, defaultValue = null) {
+    // 先用内存缓存
+    if (this._cache[key] !== undefined) return this._cache[key];
+    return defaultValue;
+  },
+
+  // 写入Firebase（异步）
+  async set(key, value) {
+    // 更新缓存
+    this._cache[key] = value;
+    // 异步写入Firebase
     try {
-      const data = localStorage.getItem(this._key(key));
-      return data ? JSON.parse(data) : defaultValue;
-    } catch (e) {
-      return defaultValue;
-    }
-  },
-
-  set(key, value) {
-    try {
-      localStorage.setItem(this._key(key), JSON.stringify(value));
-    } catch (e) {}
-    this.syncToServer();
-  },
-
-  remove(key) {
-    localStorage.removeItem(this._key(key));
-    this.syncToServer();
-  },
-
-  getAll() {
-    const sid = this.getStudentId() || 'default';
-    const prefix = this.KEY_PREFIX + sid + '_';
-    const result = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const fullKey = localStorage.key(i);
-      if (fullKey && fullKey.startsWith(prefix)) {
-        const cleanKey = fullKey.replace(prefix, '');
-        try {
-          result[cleanKey] = JSON.parse(localStorage.getItem(fullKey));
-        } catch(e) {}
-      }
-    }
-    return result;
-  },
-
-  // ===== 服务器同步 =====
-  syncToServer() {
-    if (this._syncTimer) clearTimeout(this._syncTimer);
-    this._syncTimer = setTimeout(() => {
-      const sid = this.getStudentId() || 'default';
-      const data = this.getAll();
-      // 加上学生名字信息
-      data['_name'] = this._studentName || sid;
-      fetch(API_BASE + '/api/sync', {
-        method: 'POST',
+      await fetch(this._path(key), {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: sid, data: data })
-      }).then(() => {
-        console.log('[KET] 已同步到服务器');
-      }).catch(() => {
-        console.log('[KET] 同步失败，下次自动重试');
+        body: JSON.stringify(value)
       });
-    }, 1500);
+      console.log('[KET] 已保存:', key);
+    } catch(e) {
+      console.log('[KET] 保存失败:', key, e.message);
+    }
   },
 
+  // 同步写入（用于需要立即完成的场景）
+  setSync(key, value) {
+    this._cache[key] = value;
+    fetch(this._path(key), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(value)
+    }).catch(() => {});
+  },
+
+  // 从Firebase加载全部数据到缓存
   async fetchFromServer() {
     try {
-      const sid = this.getStudentId() || 'default';
-      const resp = await fetch(API_BASE + '/api/data?studentId=' + encodeURIComponent(sid), { cache: 'no-store' });
+      const resp = await fetch(this._studentPath(), { cache: 'no-store' });
       if (resp.ok) {
         const data = await resp.json();
-        if (data && Object.keys(data).length > 0) {
-          for (const key in data) {
-            if (key.startsWith('_')) continue;
-            try {
-              localStorage.setItem(this._key(key), JSON.stringify(data[key]));
-            } catch(e) {}
-          }
-          console.log('[KET] 从服务器恢复数据成功');
+        if (data) {
+          this._cache = data;
+          console.log('[KET] 从Firebase加载数据成功');
           return true;
         }
       }
-    } catch (e) {
-      console.log('[KET] 服务器连接失败，使用本地:', e.message);
+    } catch(e) {
+      console.log('[KET] Firebase连接失败:', e.message);
     }
     return false;
+  },
+
+  getAll() {
+    return this._cache;
+  },
+
+  remove(key) {
+    delete this._cache[key];
+    fetch(this._path(key), { method: 'DELETE' }).catch(() => {});
   },
 
   // ===== 学习记录方法 =====
@@ -121,11 +107,8 @@ const Storage = {
     const streak = this.get('streak', { current: 0, lastDate: null, longest: 0 });
     if (streak.lastDate === dateStr) return;
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    if (streak.lastDate === yesterday) {
-      streak.current += 1;
-    } else {
-      streak.current = 1;
-    }
+    if (streak.lastDate === yesterday) streak.current += 1;
+    else streak.current = 1;
     streak.longest = Math.max(streak.longest, streak.current);
     streak.lastDate = dateStr;
     this.set('streak', streak);
@@ -153,7 +136,7 @@ const Storage = {
 
   getTodayData() {
     const today = new Date().toISOString().split('T')[0];
-    return this.get('sessions', []).filter(s => s.date === today);
+    return (this.get('sessions', [])).filter(s => s.date === today);
   },
 
   getLast7Days() {
@@ -162,38 +145,37 @@ const Storage = {
     for (let i = 0; i < 7; i++) {
       const d = new Date(Date.now() - i * 86400000);
       const dateStr = d.toISOString().split('T')[0];
-      const daySessions = sessions.filter(s => s.date === dateStr);
-      const stars = daySessions.reduce((sum, s) => sum + (s.stars || 0), 0);
-      const correct = daySessions.reduce((sum, s) => sum + (s.correct || 0), 0);
-      const total = daySessions.reduce((sum, s) => sum + (s.total || 0), 0);
+      const ds = sessions.filter(s => s.date === dateStr);
+      const stars = ds.reduce((s, x) => s + (x.stars || 0), 0);
+      const correct = ds.reduce((s, x) => s + (x.correct || 0), 0);
+      const total = ds.reduce((s, x) => s + (x.total || 0), 0);
       result.push({
         date: dateStr,
-        dayName: ['日', '一', '二', '三', '四', '五', '六'][d.getDay()],
-        checked: daySessions.length > 0,
-        modules: daySessions.length,
+        dayName: ['日','一','二','三','四','五','六'][d.getDay()],
+        checked: ds.length > 0, modules: ds.length,
         stars, correct, total,
-        accuracy: total > 0 ? Math.round(correct / total * 100) : 0,
-        timeSpent: daySessions.reduce((sum, s) => sum + (s.timeSpent || 0), 0)
+        accuracy: total > 0 ? Math.round(correct/total*100) : 0,
+        timeSpent: ds.reduce((s,x) => s + (x.timeSpent||0), 0)
       });
     }
     return result.reverse();
   },
 
   getWordProgress() {
-    const wordStats = this.get('wordStats', {});
-    const totalWords = typeof KET_WORDS !== 'undefined' ? KET_WORDS.length : 150;
-    const learned = Object.keys(wordStats).length;
-    const mastered = Object.values(wordStats).filter(s => s.correct >= 3).length;
-    return { total: totalWords, learned, mastered };
+    const ws = this.get('wordStats', {});
+    const total = typeof KET_WORDS !== 'undefined' ? KET_WORDS.length : 150;
+    const learned = Object.keys(ws).length;
+    const mastered = Object.values(ws).filter(s => s.correct >= 3).length;
+    return { total, learned, mastered };
   },
 
   updateWordStat(word, correct) {
-    const wordStats = this.get('wordStats', {});
-    if (!wordStats[word]) wordStats[word] = { correct: 0, wrong: 0, total: 0 };
-    wordStats[word].total += 1;
-    if (correct) { wordStats[word].correct += 1; }
-    else { wordStats[word].wrong += 1; }
-    this.set('wordStats', wordStats);
+    const ws = this.get('wordStats', {});
+    if (!ws[word]) ws[word] = { correct: 0, wrong: 0, total: 0 };
+    ws[word].total += 1;
+    if (correct) ws[word].correct += 1;
+    else ws[word].wrong += 1;
+    this.set('wordStats', ws);
   },
 
   getMistakes() { return this.get('mistakes', []); },
@@ -204,45 +186,39 @@ const Storage = {
   checkAchievements() {
     const stats = this.get('stats', { totalStars: 0, totalCorrect: 0, totalQuestions: 0 });
     const streak = this.get('streak', { current: 0, longest: 0 });
-    const wordProgress = this.getWordProgress();
-    const achievements = this.get('achievements', []);
-    const unlocked = new Set(achievements.map(a => a.id));
-
-    const allAchievements = [
-      { id: 'first_star', name: '⭐ 初露锋芒', desc: '获得第一颗星星', condition: () => stats.totalStars >= 1 },
-      { id: 'ten_stars', name: '🌟 小有成就', desc: '获得10颗星星', condition: () => stats.totalStars >= 10 },
-      { id: 'fifty_stars', name: '💫 星光闪耀', desc: '获得50颗星星', condition: () => stats.totalStars >= 50 },
-      { id: 'hundred_stars', name: '✨ 百星之王', desc: '获得100颗星星', condition: () => stats.totalStars >= 100 },
-      { id: 'streak_3', name: '🔥 三连打卡', desc: '连续学习3天', condition: () => streak.longest >= 3 },
-      { id: 'streak_7', name: '📅 坚持一周', desc: '连续学习7天', condition: () => streak.longest >= 7 },
-      { id: 'streak_30', name: '🏆 月度冠军', desc: '连续学习30天', condition: () => streak.longest >= 30 },
-      { id: 'words_50', name: '📚 词汇达人', desc: '掌握50个单词', condition: () => wordProgress.mastered >= 50 },
-      { id: 'words_100', name: '📖 词汇大师', desc: '掌握100个单词', condition: () => wordProgress.mastered >= 100 },
-      { id: 'words_150', name: '🎓 词汇博士', desc: '掌握全部150个单词', condition: () => wordProgress.mastered >= 150 },
-      { id: 'accuracy_80', name: '🎯 精准射手', desc: '正确率达到80%', condition: () => stats.totalQuestions >= 20 && (stats.totalCorrect / stats.totalQuestions) >= 0.8 },
-      { id: 'accuracy_90', name: '🎖️ 神枪手', desc: '正确率达到90%', condition: () => stats.totalQuestions >= 50 && (stats.totalCorrect / stats.totalQuestions) >= 0.9 },
+    const wp = this.getWordProgress();
+    const ach = this.get('achievements', []);
+    const unlocked = new Set(ach.map(a => a.id));
+    const all = [
+      { id:'first_star', name:'⭐ 初露锋芒', desc:'获得第一颗星星', c:()=>stats.totalStars>=1 },
+      { id:'ten_stars', name:'🌟 小有成就', desc:'获得10颗星星', c:()=>stats.totalStars>=10 },
+      { id:'fifty_stars', name:'💫 星光闪耀', desc:'获得50颗星星', c:()=>stats.totalStars>=50 },
+      { id:'hundred_stars', name:'✨ 百星之王', desc:'获得100颗星星', c:()=>stats.totalStars>=100 },
+      { id:'streak_3', name:'🔥 三连打卡', desc:'连续学习3天', c:()=>streak.longest>=3 },
+      { id:'streak_7', name:'📅 坚持一周', desc:'连续学习7天', c:()=>streak.longest>=7 },
+      { id:'streak_30', name:'🏆 月度冠军', desc:'连续学习30天', c:()=>streak.longest>=30 },
+      { id:'words_50', name:'📚 词汇达人', desc:'掌握50个单词', c:()=>wp.mastered>=50 },
+      { id:'words_100', name:'📖 词汇大师', desc:'掌握100个单词', c:()=>wp.mastered>=100 },
+      { id:'words_150', name:'🎓 词汇博士', desc:'掌握全部150个单词', c:()=>wp.mastered>=150 },
+      { id:'accuracy_80', name:'🎯 精准射手', desc:'正确率达到80%', c:()=>stats.totalQuestions>=20&&(stats.totalCorrect/stats.totalQuestions)>=0.8 },
+      { id:'accuracy_90', name:'🎖️ 神枪手', desc:'正确率达到90%', c:()=>stats.totalQuestions>=50&&(stats.totalCorrect/stats.totalQuestions)>=0.9 },
     ];
-
-    const newAchievements = [];
-    allAchievements.forEach(a => {
-      if (!unlocked.has(a.id) && a.condition()) {
-        newAchievements.push(a);
-        achievements.push({ id: a.id, name: a.name, desc: a.desc, date: new Date().toISOString() });
+    const newAch = [];
+    all.forEach(a => {
+      if (!unlocked.has(a.id) && a.c()) {
+        newAch.push(a);
+        ach.push({ id:a.id, name:a.name, desc:a.desc, date:new Date().toISOString() });
       }
     });
-    if (newAchievements.length > 0) this.set('achievements', achievements);
-    return newAchievements;
+    if (newAch.length > 0) this.set('achievements', ach);
+    return newAch;
   },
 
   exportData() {
-    const data = this.getAll();
-    data._exportDate = new Date().toISOString();
-    data._appVersion = '3.0';
-    return data;
+    return { ...this._cache, _exportDate: new Date().toISOString(), _appVersion: '4.0' };
   },
 
   getCurrentWordDay() { return this.get('currentWordDay', 1); },
-
   advanceWordDay() {
     let day = this.get('currentWordDay', 1);
     day = (day % 15) + 1;
@@ -251,17 +227,9 @@ const Storage = {
   },
 
   resetAll() {
-    const prefix = this.KEY_PREFIX + (this.getStudentId() || 'default') + '_';
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(prefix)) keys.push(key);
-    }
-    keys.forEach(k => localStorage.removeItem(k));
-    this.syncToServer();
+    this._cache = {};
+    fetch(this._studentPath(), { method: 'DELETE' }).catch(() => {});
   }
 };
 
-if (typeof window !== 'undefined') {
-  window.Storage = Storage;
-}
+if (typeof window !== 'undefined') window.Storage = Storage;
