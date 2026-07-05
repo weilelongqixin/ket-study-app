@@ -1,9 +1,156 @@
 {
   "stats": {
-    "totalStars": 20,
-    "totalCorrect": 35,
-    "totalQuestions": 45
+    "totalStars": 22,
+    "totalCorrect": 41,
+    "totalQuestions": 60
   },
   "_name": "大宝",
-  "_lastSync": "2026-07-05T22:46:54.671568"
+  "_lastSync": "2026-07-06T00:20:58.896048",
+  "wordStats": {
+    "airport": {
+      "correct": 1,
+      "wrong": 0,
+      "total": 1
+    },
+    "backpack": {
+      "correct": 1,
+      "wrong": 0,
+      "total": 1
+    },
+    "birthday": {
+      "correct": 0,
+      "wrong": 1,
+      "total": 1
+    },
+    "boring": {
+      "correct": 1,
+      "wrong": 0,
+      "total": 1
+    },
+    "camera": {
+      "correct": 0,
+      "wrong": 1,
+      "total": 1
+    },
+    "celebrate": {
+      "correct": 0,
+      "wrong": 1,
+      "total": 1
+    },
+    "cheap": {
+      "correct": 1,
+      "wrong": 0,
+      "total": 1
+    },
+    "choice": {
+      "correct": 0,
+      "wrong": 1,
+      "total": 1
+    },
+    "comfortable": {
+      "correct": 0,
+      "wrong": 1,
+      "total": 1
+    },
+    "dangerous": {
+      "correct": 1,
+      "wrong": 0,
+      "total": 1
+    }
+  },
+  "mistakes": [
+    {
+      "module": "words",
+      "word": "birthday",
+      "date": "2026-07-05",
+      "timestamp": 1783268437413
+    },
+    {
+      "module": "words",
+      "word": "camera",
+      "date": "2026-07-05",
+      "timestamp": 1783268439563
+    },
+    {
+      "module": "words",
+      "word": "celebrate",
+      "date": "2026-07-05",
+      "timestamp": 1783268440645
+    },
+    {
+      "module": "words",
+      "word": "choice",
+      "date": "2026-07-05",
+      "timestamp": 1783268442728
+    },
+    {
+      "module": "words",
+      "word": "comfortable",
+      "date": "2026-07-05",
+      "timestamp": 1783268444979
+    },
+    {
+      "module": "words",
+      "word": null,
+      "date": "2026-07-05",
+      "timestamp": 1783268456590
+    },
+    {
+      "module": "words",
+      "word": null,
+      "date": "2026-07-05",
+      "timestamp": 1783268456590
+    },
+    {
+      "module": "words",
+      "word": null,
+      "date": "2026-07-05",
+      "timestamp": 1783268456590
+    },
+    {
+      "module": "words",
+      "word": null,
+      "date": "2026-07-05",
+      "timestamp": 1783268456590
+    }
+  ],
+  "streak": {
+    "current": 1,
+    "lastDate": "2026-07-05",
+    "longest": 1
+  },
+  "sessions": [
+    {
+      "date": "2026-07-05",
+      "module": "words",
+      "timestamp": 1783268447062,
+      "stars": 1,
+      "correct": 5,
+      "total": 10,
+      "timeSpent": 17
+    },
+    {
+      "date": "2026-07-05",
+      "module": "words",
+      "timestamp": 1783268456591,
+      "stars": 1,
+      "correct": 1,
+      "total": 5,
+      "timeSpent": 6
+    }
+  ],
+  "achievements": [
+    {
+      "id": "first_star",
+      "name": "⭐ 初露锋芒",
+      "desc": "获得第一颗星星",
+      "date": "2026-07-05T16:20:47.063Z"
+    },
+    {
+      "id": "ten_stars",
+      "name": "🌟 小有成就",
+      "desc": "获得10颗星星",
+      "date": "2026-07-05T16:20:47.063Z"
+    }
+  ]
 }

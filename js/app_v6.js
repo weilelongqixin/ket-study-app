@@ -129,6 +129,82 @@ const App = {
           : '👋 今天还没开始学习哦，加油！'}
       </div>
     `;
+
+    // 标记今天已完成的模块卡片为绿色
+    this._markCompletedModules(todayData);
+  },
+
+  _markCompletedModules(todayData) {
+    // 获取今天已完成的模块名集合
+    const completedModules = new Set(todayData.map(d => d.module));
+    
+    // 模块名到卡片onclick的映射
+    const moduleMap = {
+      'words': 'words',
+      '单词': 'words',
+      'reading': 'reading',
+      '阅读': 'reading',
+      'listening': 'listening',
+      '听力': 'listening',
+      'exam': 'exam',
+      '口语': 'exam',
+      'speaking': 'exam',
+      'authentic': 'authentic',
+      '真题听力': 'authentic'
+    };
+    
+    const completedViews = new Set();
+    completedModules.forEach(m => {
+      const view = moduleMap[m];
+      if (view) completedViews.add(view);
+    });
+    
+    // 遍历所有模块卡片，标记已完成
+    const cards = document.querySelectorAll('.module-card');
+    cards.forEach(card => {
+      // 获取卡片的onclick里的view名
+      const onclick = card.getAttribute('onclick') || '';
+      const match = onclick.match(/showView\(['"]([^'"]+)['"]\)/);
+      const viewName = match ? match[1] : '';
+      
+      // 移除旧标记
+      card.style.border = '';
+      card.style.background = '';
+      card.style.opacity = '';
+      
+      // 找到名字元素和时间元素
+      const nameEl = card.querySelector('.module-name');
+      const timeEl = card.querySelector('.module-time');
+      
+      // 移除旧的完成标记
+      const oldBadge = card.querySelector('.done-badge');
+      if (oldBadge) oldBadge.remove();
+      
+      if (completedViews.has(viewName)) {
+        // 标记为已完成：绿色边框+背景+✅标记
+        card.style.border = '2px solid #22c55e';
+        card.style.background = 'linear-gradient(135deg,#f0fdf4,#dcfce7)';
+        if (timeEl) {
+ timeEl.innerHTML = '✅ 今天已完成';
+          timeEl.style.color = '#16a34a';
+          timeEl.style.fontWeight = 'bold';
+        }
+      } else {
+        // 恢复原始时间文字
+        if (timeEl) {
+          timeEl.style.color = '';
+          timeEl.style.fontWeight = '';
+          const defaults = {
+            'words': '⏱️ 5分钟 · 每天10词',
+            'reading': '⏱️ 5分钟 · A2短文',
+            'listening': '⏱️ 5分钟 · 真实场景',
+            'exam': '⏱️ 5分钟 · 按星期分配',
+            'authentic': '⏱️ 20分钟 · 2024-2025原版'
+          };
+          if (defaults[viewName]) timeEl.innerHTML = defaults[viewName];
+        }
+      }
+    });
   },
 
   renderAchievements() {
