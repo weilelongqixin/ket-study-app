@@ -90,17 +90,42 @@ const App = {
     const streak = Storage.getStreak();
     const wordProgress = Storage.getWordProgress();
     const todayData = Storage.getTodayData();
+    const allModules = ['words', 'reading', 'listening', 'authentic', 'exam'];
 
     const el = document.getElementById('home-stats');
     if (!el) return;
 
     const todayStars = todayData.reduce((s, d) => s + (d.stars || 0), 0);
-    const todayModules = new Set(todayData.map(d => d.module)).size;
+    const completedToday = new Set(todayData.map(d => d.module));
+    const todayModuleCount = completedToday.size;
+    const totalModules = allModules.length;
     const accuracy = stats.totalQuestions > 0
       ? Math.round(stats.totalCorrect / stats.totalQuestions * 100)
       : 0;
+    const progressPercent = Math.round(todayModuleCount / totalModules * 100);
+
+    // 鼓励语
+    let encourage = '';
+    if (progressPercent === 0) encourage = '准备好开始今天的学习了吗？💪';
+    else if (progressPercent < 40) encourage = '不错！继续加油鸭~ 🦆';
+    else if (progressPercent < 80) encourage = '太棒了！马上就全部完成啦！🎉';
+    else if (progressPercent < 100) encourage = '就差一点点！冲鸭！🚀';
+    else encourage = '全部完成！你是学习小冠军！🏆';
 
     el.innerHTML = `
+      <!-- 今日进度条 -->
+      <div class="today-progress-wrap">
+        <div class="today-progress-header">
+          <span class="today-progress-title">📅 今日进度</span>
+          <span class="today-progress-count">${todayModuleCount}/${totalModules}</span>
+        </div>
+        <div class="today-progress-bar-bg">
+          <div class="today-progress-bar-fill" style="width:${progressPercent}%"></div>
+        </div>
+        <div class="today-progress-encourage">${encourage}</div>
+      </div>
+
+      <!-- 数据统计 -->
       <div class="stats-grid">
         <div class="stat-card stat-stars">
           <div class="stat-icon">⭐</div>
@@ -123,11 +148,13 @@ const App = {
           <div class="stat-label">已掌握单词</div>
         </div>
       </div>
+
+      <!-- 今日获得 -->
+      ${todayModuleCount > 0 ? `
       <div class="today-banner">
-        ${todayModules > 0
-          ? `✅ 今天已完成 ${todayModules} 个模块，获得 ${todayStars} ⭐`
-          : '👋 今天还没开始学习哦，加油！'}
+        ✅ 今天已完成 ${todayModuleCount} 个模块，获得 ${todayStars} ⭐
       </div>
+      ` : ''}
     `;
 
     // 标记今天已完成的模块卡片为绿色
@@ -194,14 +221,8 @@ const App = {
         if (timeEl) {
           timeEl.style.color = '';
           timeEl.style.fontWeight = '';
-          const defaults = {
-            'words': '⏱️ 5分钟 · 每天10词',
-            'reading': '⏱️ 5分钟 · A2短文',
-            'listening': '⏱️ 5分钟 · 真实场景',
-            'exam': '⏱️ 5分钟 · 按星期分配',
-            'authentic': '⏱️ 20分钟 · 2024-2025原版'
-          };
-          if (defaults[viewName]) timeEl.innerHTML = defaults[viewName];
+          const def = timeEl.getAttribute('data-default');
+          if (def) timeEl.innerHTML = def;
         }
       }
     });

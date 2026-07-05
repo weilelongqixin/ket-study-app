@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#2563eb">
   <title>KET学习营 - 每日20分钟冲刺</title>
-  <link rel="stylesheet" href="css/style.css?v=20260705v2">
+  <link rel="stylesheet" href="css/style.css?v=20260706v1">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
   <style>
     .login-screen {
@@ -100,30 +100,35 @@
       <div id="home-stats"></div>
       <h3 class="section-title">📋 今日任务（每天20分钟）</h3>
       <div class="module-grid">
-        <div class="module-card" onclick="App.showView('words')">
+        <div class="module-card" onclick="App.showView('words')" data-module="1">
+          <div class="module-step">1</div>
           <div class="module-icon">📝</div>
           <div class="module-name">单词关卡</div>
-          <div class="module-time">⏱️ 5分钟 · 每天10词</div>
+          <div class="module-time" data-default="⏱️ 5分钟 · 每天10词">⏱️ 5分钟 · 每天10词</div>
         </div>
-        <div class="module-card" onclick="App.showView('reading')">
+        <div class="module-card" onclick="App.showView('reading')" data-module="2">
+          <div class="module-step">2</div>
           <div class="module-icon">📖</div>
           <div class="module-name">阅读理解</div>
-          <div class="module-time">⏱️ 5分钟 · A2短文</div>
+          <div class="module-time" data-default="⏱️ 5分钟 · A2短文">⏱️ 5分钟 · A2短文</div>
         </div>
-        <div class="module-card" onclick="App.showView('listening')">
+        <div class="module-card" onclick="App.showView('listening')" data-module="3">
+          <div class="module-step">3</div>
           <div class="module-icon">👂</div>
           <div class="module-name">听力练习</div>
-          <div class="module-time">⏱️ 5分钟 · 真实场景</div>
+          <div class="module-time" data-default="⏱️ 5分钟 · 真实场景">⏱️ 5分钟 · 真实场景</div>
         </div>
-        <div class="module-card" onclick="App.showView('authentic')" style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);">
+        <div class="module-card" onclick="App.showView('authentic')" data-module="4" style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);">
+          <div class="module-step">4</div>
           <div class="module-icon">🎧</div>
           <div class="module-name">真题听力</div>
-          <div class="module-time">⏱️ 20分钟 · 2024-2025原版</div>
+          <div class="module-time" data-default="⏱️ 20分钟 · 2024-2025原版">⏱️ 20分钟 · 2024-2025原版</div>
         </div>
-        <div class="module-card" onclick="App.showView('exam')">
+        <div class="module-card" onclick="App.showView('exam')" data-module="5">
+          <div class="module-step">5</div>
           <div class="module-icon">🗣️</div>
           <div class="module-name">口语训练</div>
-          <div class="module-time">⏱️ 5分钟 · 按星期分配</div>
+          <div class="module-time" data-default="⏱️ 5分钟 · 按星期分配">⏱️ 5分钟 · 按星期分配</div>
         </div>
       </div>
       <h3 class="section-title">🏆 成就墙</h3>
@@ -168,8 +173,8 @@
 <script src="data/speaking.js"></script>
 <script src="data/exam.js"></script>
 <script src="data/authentic_listening.js"></script>
-<script src="js/storage.js?v=20260705v3"></script>
-<script src="js/app_v6.js?v=20260705v3"></script>
+<script src="js/storage.js?v=20260706v1"></script>
+<script src="js/app_v6.js?v=20260706v1"></script>
 
 </body>
 </html>

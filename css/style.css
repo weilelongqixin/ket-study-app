@@ -633,3 +633,69 @@ body {
   #app { max-width: 720px; }
   .module-grid { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ===== 今日进度条 ===== */
+.today-progress-wrap {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.today-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.today-progress-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e40af;
+}
+.today-progress-count {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #2563eb;
+}
+.today-progress-bar-bg {
+  height: 14px;
+  background: #e0e7ff;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.today-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+  border-radius: 7px;
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+.today-progress-encourage {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #1e40af;
+  text-align: center;
+}
+
+/* ===== 模块序号 ===== */
+.module-card { position: relative; }
+.module-step {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  background: #e0e7ff;
+  color: #6366f1;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.module-card[style*="22c55e"] .module-step,
+.module-card[style*="dcfce7"] .module-step {
+  background: #22c55e !important;
+  color: #fff !important;
+}
