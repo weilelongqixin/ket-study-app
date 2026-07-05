@@ -1,11 +1,12 @@
-// Storage Module - localStorage based data persistence + server sync
+// Storage Module - 服务器为主，localStorage为缓存
 const API_BASE = 'http://192.168.3.17:9090'; // 改这里切换服务器地址
 
 const Storage = {
   KEY_PREFIX: 'ket_study_',
   _syncTimer: null,
+  _initialized: false,
 
-  // Get data from localStorage
+  // Get data from localStorage (cache)
   get(key, defaultValue = null) {
     try {
       const data = localStorage.getItem(this.KEY_PREFIX + key);
@@ -16,20 +17,20 @@ const Storage = {
     }
   },
 
-  // Save data to localStorage
+  // Save data to localStorage AND schedule server sync
   set(key, value) {
     try {
       localStorage.setItem(this.KEY_PREFIX + key, JSON.stringify(value));
-      return true;
     } catch (e) {
       console.error('Storage set error:', e);
-      return false;
     }
+    this.syncToServer();
   },
 
   // Remove data
   remove(key) {
     localStorage.removeItem(this.KEY_PREFIX + key);
+    this.syncToServer();
   },
 
   // Get all data
@@ -45,7 +46,9 @@ const Storage = {
     return result;
   },
 
-  // Sync all data to server (debounced)
+  // ===== 服务器同步核心 =====
+
+  // Upload all local data to server (debounced 1.5s)
   syncToServer() {
     if (this._syncTimer) clearTimeout(this._syncTimer);
     this._syncTimer = setTimeout(() => {
@@ -54,35 +57,42 @@ const Storage = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-      }).catch(() => {}); // Silent fail
-    }, 2000);
+      }).then(() => {
+        console.log('[KET] 数据已同步到服务器');
+      }).catch((e) => {
+        console.log('[KET] 同步失败，下次自动重试');
+      });
+    }, 1500);
   },
 
-  // Fetch data from server (for parent view)
+  // 从服务器拉取全部数据，覆盖本地缓存
+  // 这是每次打开应用时第一个要调用的方法
   async fetchFromServer() {
     try {
       const resp = await fetch(API_BASE + '/api/data', { cache: 'no-store' });
       if (resp.ok) {
         const data = await resp.json();
-        if (data && Object.keys(data).length > 1) {
-          // Merge server data into localStorage
+        if (data && Object.keys(data).length > 0) {
+          // 用服务器数据覆盖本地
           for (const key in data) {
-            if (key.startsWith('_')) continue;
-            const localVal = this.get(key);
-            const serverVal = data[key];
-            // Use server data if it has more info
-            if (JSON.stringify(serverVal) !== JSON.stringify(localVal)) {
-              this.set(key, serverVal);
-            }
+            if (key.startsWith('_')) continue; // 跳过元数据
+            try {
+              localStorage.setItem(this.KEY_PREFIX + key, JSON.stringify(data[key]));
+            } catch (e) {}
           }
+          console.log('[KET] 从服务器恢复数据成功');
+          this._initialized = true;
           return true;
         }
       }
     } catch (e) {
-      console.log('Sync fetch failed:', e);
+      console.log('[KET] 服务器连接失败，使用本地缓存:', e.message);
     }
+    this._initialized = true;
     return false;
   },
+
+  // ===== 学习记录方法 =====
 
   // Record a study session
   recordSession(module, data) {
@@ -97,14 +107,13 @@ const Storage = {
     this.set('sessions', sessions);
     this.updateStreak(today);
     this.addStars(data.stars || 0);
-    this.syncToServer();
   },
 
   // Update daily streak
   updateStreak(dateStr) {
     const streak = this.get('streak', { current: 0, lastDate: null, longest: 0 });
     
-    if (streak.lastDate === dateStr) return; // Already counted today
+    if (streak.lastDate === dateStr) return;
     
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     
@@ -134,7 +143,6 @@ const Storage = {
     if (correct) stats.totalCorrect += 1;
     this.set('stats', stats);
 
-    // Record wrong answers for mistake book
     if (!correct) {
       const mistakes = this.get('mistakes', []);
       mistakes.push({
@@ -143,11 +151,9 @@ const Storage = {
         date: new Date().toISOString().split('T')[0],
         timestamp: Date.now()
       });
-      // Keep only last 200 mistakes
       if (mistakes.length > 200) mistakes.shift();
       this.set('mistakes', mistakes);
     }
-    this.syncToServer();
   },
 
   // Get today's study data
@@ -205,7 +211,6 @@ const Storage = {
       wordStats[word].wrong += 1;
     }
     this.set('wordStats', wordStats);
-    this.syncToServer();
   },
 
   // Get mistakes
@@ -276,8 +281,7 @@ const Storage = {
 
   // Get current day for word study (1-15, cycles)
   getCurrentWordDay() {
-    const wordDay = this.get('currentWordDay', 1);
-    return wordDay;
+    return this.get('currentWordDay', 1);
   },
 
   // Advance to next word day
@@ -288,7 +292,7 @@ const Storage = {
     return day;
   },
 
-  // Reset all data (for testing)
+  // Reset all data
   resetAll() {
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -298,6 +302,7 @@ const Storage = {
       }
     }
     keys.forEach(k => localStorage.removeItem(k));
+    this.syncToServer();
   }
 };
 

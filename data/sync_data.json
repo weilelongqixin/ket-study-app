@@ -5,5 +5,26 @@
     "totalCorrect": 30,
     "totalQuestions": 38
   },
-  "_lastSync": "2026-07-05T22:07:31.298504"
+  "_lastSync": "2026-07-05T22:09:12.502183",
+  "streak": {
+    "current": 1,
+    "lastDate": "2026-07-05",
+    "longest": 1
+  },
+  "sessions": [
+    {
+      "date": "2026-07-05",
+      "module": "words",
+      "stars": 5,
+      "correct": 8,
+      "total": 10
+    }
+  ],
+  "wordStats": {
+    "apple": {
+      "correct": 2,
+      "wrong": 0,
+      "total": 2
+    }
+  }
 }
