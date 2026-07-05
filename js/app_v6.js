@@ -4,18 +4,48 @@ const App = {
   speechSynthesis: window.speechSynthesis || null,
   selectedSpeechRate: 0.9,
 
-  // Initialize app
+  // Initialize app - check if logged in
   init() {
-    // Try to fetch server data on load
-    Storage.fetchFromServer().then(() => {
-      this.showView('home');
-      this.updateHomeStats();
-      this.renderAchievements();
-    }).catch(() => {
-      this.showView('home');
-      this.updateHomeStats();
-      this.renderAchievements();
-    });
+    const savedId = Storage.getStudentId();
+    if (savedId) {
+      // 已登录，直接进主应用
+      const names = { 'student1': '大宝', 'student2': '二宝', 'parent': '家长' };
+      Storage.setStudent(savedId, names[savedId] || savedId);
+      this.enterApp();
+    }
+    // 否则显示登录选学生页面
+  },
+
+  // 学生登录
+  login(id, name) {
+    Storage.setStudent(id, name);
+    this.enterApp();
+  },
+
+  // 进入主应用
+  enterApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    const badge = document.getElementById('student-badge');
+    const sid = Storage.getStudentId();
+    const names = { 'student1': '👦 大宝', 'student2': '👧 二宝', 'parent': '👨‍👩‍👦 家长' };
+    if (badge) badge.textContent = names[sid] || sid;
+
+    if (sid === 'parent') {
+      // 家长直接看面板
+      this.showView('parent');
+    } else {
+      // 学生先从服务器拉数据再显示
+      Storage.fetchFromServer().then(() => {
+        this.showView('home');
+        this.updateHomeStats();
+        this.renderAchievements();
+      }).catch(() => {
+        this.showView('home');
+        this.updateHomeStats();
+        this.renderAchievements();
+      });
+    }
   },
 
   // Navigation
@@ -1310,17 +1340,119 @@ const App = {
   },
 
   showParentPanel() {
-    // First show loading, then fetch from server
     const el = document.getElementById('view-parent');
     el.innerHTML = `
       <div class="parent-login">
         <div class="login-icon">⏳</div>
-        <h2>正在同步数据...</h2>
+        <h2>正在加载所有学生数据...</h2>
       </div>
     `;
-    Storage.fetchFromServer().then(() => {
-      this._renderParentPanel();
-    });
+    this._loadAllStudents();
+  },
+
+  async _loadAllStudents() {
+    const students = [
+      { id: 'student1', name: '👦 大宝' },
+      { id: 'student2', name: '👧 二宝' }
+    ];
+    
+    // 从服务器拉每个学生的数据
+    for (const s of students) {
+      try {
+        const resp = await fetch(API_BASE + '/api/data?studentId=' + s.id, { cache: 'no-store' });
+        if (resp.ok) {
+          const data = await resp.json();
+          s.data = data;
+        }
+      } catch(e) {}
+    }
+    this._renderParentPanelAll(students);
+  },
+
+  _renderParentPanelAll(students) {
+    const el = document.getElementById('view-parent');
+    let html = '<div class="parent-panel"><div class="parent-header"><h2>👨‍👩‍👦 家长监控面板</h2></div>';
+
+    for (const s of students) {
+      const d = s.data || {};
+      const stats = d.stats || { totalStars: 0, totalCorrect: 0, totalQuestions: 0 };
+      const streak = d.streak || { current: 0, longest: 0 };
+      const sessions = d.sessions || [];
+      const today = new Date().toISOString().split('T')[0];
+      const todaySessions = sessions.filter(ss => ss.date === today);
+      const todayStars = todaySessions.reduce((sum, ss) => sum + (ss.stars || 0), 0);
+      const todayCorrect = todaySessions.reduce((sum, ss) => sum + (ss.correct || 0), 0);
+      const todayTotal = todaySessions.reduce((sum, ss) => sum + (ss.total || 0), 0);
+      const todayAcc = todayTotal > 0 ? Math.round(todayCorrect / todayTotal * 100) : 0;
+      const overallAcc = stats.totalQuestions > 0 ? Math.round(stats.totalCorrect / stats.totalQuestions * 100) : 0;
+      const wordStats = d.wordStats || {};
+      const mastered = Object.values(wordStats).filter(w => w.correct >= 3).length;
+      const mistakes = d.mistakes || [];
+
+      html += `
+        <div class="parent-section" style="border:2px solid #e0f2fe;border-radius:12px;padding:12px;margin:12px 0;">
+          <h3>${s.name} 的学习数据</h3>
+          <div class="parent-stats-grid">
+            <div class="parent-stat">
+              <div class="parent-stat-label">⭐ 总星星</div>
+              <div class="parent-stat-value">${stats.totalStars || 0}</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">🎯 总正确率</div>
+              <div class="parent-stat-value">${overallAcc}%</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">🔥 连续打卡</div>
+              <div class="parent-stat-value">${streak.current || 0}天</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">📚 掌握单词</div>
+              <div class="parent-stat-value">${mastered}/150</div>
+            </div>
+          </div>
+          <div class="parent-stats-grid" style="margin-top:8px;">
+            <div class="parent-stat">
+              <div class="parent-stat-label">✅ 今日完成</div>
+              <div class="parent-stat-value">${new Set(todaySessions.map(ss => ss.module)).size}模块</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">📊 今日正确率</div>
+              <div class="parent-stat-value">${todayAcc}%</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">⭐ 今日星星</div>
+              <div class="parent-stat-value">${todayStars}</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">❌ 错题数</div>
+              <div class="parent-stat-value">${mistakes.length}</div>
+            </div>
+          </div>
+          ${todaySessions.length > 0 ? `
+            <details style="margin-top:8px;">
+              <summary style="cursor:pointer;color:#2563eb;">📋 今日答题详情</summary>
+              ${todaySessions.map(ss => `
+                <div style="padding:4px 0;border-bottom:1px solid #eee;font-size:14px;">
+                  ${ss.module}: ${ss.correct || 0}/${ss.total || 0} 正确 (${ss.stars || 0}⭐)
+                </div>
+              `).join('')}
+            </details>
+          ` : '<p style="color:#999;font-size:14px;margin-top:8px;">今天还没学习</p>'}
+          ${mistakes.length > 0 ? `
+            <details style="margin-top:8px;">
+              <summary style="cursor:pointer;color:#ef4444;">❌ 最近错题 (${mistakes.length})</summary>
+              ${mistakes.slice(-10).reverse().map(m => `
+                <div style="padding:2px 0;font-size:13px;color:#666;">
+                  ${m.module}: ${m.word || ''} (${m.date})
+                </div>
+              `).join('')}
+            </details>
+          ` : ''}
+        </div>
+      `;
+    }
+    html += '</div>';
+    el.innerHTML = html;
   },
 
   _renderParentPanel() {

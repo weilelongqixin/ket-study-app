@@ -7,102 +7,159 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#2563eb">
   <title>KET学习营 - 每日20分钟冲刺</title>
-  <link rel="stylesheet" href="css/style.css?v=20260704v1">
+  <link rel="stylesheet" href="css/style.css?v=20260705v2">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <style>
+    .login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .login-screen .login-icon-big {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    .login-screen h1 {
+      color: #2563eb;
+      margin-bottom: 8px;
+    }
+    .login-screen p {
+      color: #666;
+      margin-bottom: 24px;
+    }
+    .student-btn {
+      display: block;
+      width: 100%;
+      max-width: 300px;
+      padding: 16px;
+      margin: 8px auto;
+      font-size: 18px;
+      border: 2px solid #2563eb;
+      border-radius: 12px;
+      background: #fff;
+      color: #2563eb;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .student-btn:hover, .student-btn:active {
+      background: #2563eb;
+      color: #fff;
+    }
+    .student-btn .student-emoji {
+      font-size: 28px;
+      margin-right: 8px;
+    }
+    .login-hint {
+      margin-top: 24px;
+      font-size: 13px;
+      color: #999;
+    }
+    .student-header {
+      display: inline-block;
+      background: #e0f2fe;
+      color: #2563eb;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      margin-left: 8px;
+    }
+  </style>
 </head>
 <body>
 
 <div id="app">
-  <!-- Header -->
-  <div class="app-header">
-    <h1 id="app-title">🏠 KET学习营</h1>
+  <!-- 登录选学生页面 -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-icon-big">🎓</div>
+    <h1>KET学习营</h1>
+    <p>选择你是谁，开始今天的学习吧！</p>
+    <button class="student-btn" onclick="App.login('student1', '大宝')">
+      <span class="student-emoji">👦</span>我是大宝
+    </button>
+    <button class="student-btn" onclick="App.login('student2', '二宝')">
+      <span class="student-emoji">👧</span>我是二宝
+    </button>
+    <button class="student-btn" onclick="App.login('parent', '家长')" style="border-color:#f59e0b;color:#f59e0b;">
+      <span class="student-emoji">👨‍👩‍👦</span>我是家长
+    </button>
+    <p class="login-hint">选择后系统会记住你的身份</p>
   </div>
 
-  <!-- HOME VIEW -->
-  <div class="view active" id="view-home">
-    <div id="home-stats"></div>
+  <!-- 主应用（登录后显示） -->
+  <div id="main-app" style="display:none;">
+    <div class="app-header">
+      <h1 id="app-title">🏠 KET学习营</h1>
+      <span id="student-badge" class="student-header"></span>
+    </div>
 
-    <h3 class="section-title">📋 今日任务（每天20分钟）</h3>
-    <div class="module-grid">
-      <div class="module-card" onclick="App.showView('words')">
-        <div class="module-icon">📝</div>
-        <div class="module-name">单词关卡</div>
-        <div class="module-time">⏱️ 5分钟 · 每天10词</div>
+    <div class="view active" id="view-home">
+      <div id="home-stats"></div>
+      <h3 class="section-title">📋 今日任务（每天20分钟）</h3>
+      <div class="module-grid">
+        <div class="module-card" onclick="App.showView('words')">
+          <div class="module-icon">📝</div>
+          <div class="module-name">单词关卡</div>
+          <div class="module-time">⏱️ 5分钟 · 每天10词</div>
+        </div>
+        <div class="module-card" onclick="App.showView('reading')">
+          <div class="module-icon">📖</div>
+          <div class="module-name">阅读理解</div>
+          <div class="module-time">⏱️ 5分钟 · A2短文</div>
+        </div>
+        <div class="module-card" onclick="App.showView('listening')">
+          <div class="module-icon">👂</div>
+          <div class="module-name">听力练习</div>
+          <div class="module-time">⏱️ 5分钟 · 真实场景</div>
+        </div>
+        <div class="module-card" onclick="App.showView('authentic')" style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);">
+          <div class="module-icon">🎧</div>
+          <div class="module-name">真题听力</div>
+          <div class="module-time">⏱️ 20分钟 · 2024-2025原版</div>
+        </div>
+        <div class="module-card" onclick="App.showView('exam')">
+          <div class="module-icon">🗣️</div>
+          <div class="module-name">口语训练</div>
+          <div class="module-time">⏱️ 5分钟 · 按星期分配</div>
+        </div>
       </div>
-      <div class="module-card" onclick="App.showView('reading')">
-        <div class="module-icon">📖</div>
-        <div class="module-name">阅读理解</div>
-        <div class="module-time">⏱️ 5分钟 · A2短文</div>
+      <h3 class="section-title">🏆 成就墙</h3>
+      <div class="achievements-grid" id="home-achievements"></div>
+    </div>
+
+    <div class="view" id="view-words"></div>
+    <div class="view" id="view-reading"></div>
+    <div class="view" id="view-listening"></div>
+    <div class="view" id="view-exam"></div>
+    <div class="view" id="view-authentic"></div>
+    <div class="view" id="view-parent"></div>
+
+    <div class="nav-bar">
+      <div class="nav-item active" data-view="home" onclick="App.showView('home')">
+        <span class="nav-icon">🏠</span><span class="nav-label">首页</span>
       </div>
-      <div class="module-card" onclick="App.showView('listening')">
-        <div class="module-icon">👂</div>
-        <div class="module-name">听力练习</div>
-        <div class="module-time">⏱️ 5分钟 · 真实场景</div>
+      <div class="nav-item" data-view="words" onclick="App.showView('words')">
+        <span class="nav-icon">📝</span><span class="nav-label">单词</span>
       </div>
-      <div class="module-card" onclick="App.showView('authentic')" style="background:linear-gradient(135deg,#fff3e0,#ffe0b2);">
-        <div class="module-icon">🎧</div>
-        <div class="module-name">真题听力</div>
-        <div class="module-time">⏱️ 20分钟 · 2024-2025原版</div>
+      <div class="nav-item" data-view="reading" onclick="App.showView('reading')">
+        <span class="nav-icon">📖</span><span class="nav-label">阅读</span>
       </div>
-      <div class="module-card" onclick="App.showView('exam')">
-        <div class="module-icon">🗣️</div>
-        <div class="module-name">口语训练</div>
-        <div class="module-time">⏱️ 5分钟 · 按星期分配</div>
+      <div class="nav-item" data-view="listening" onclick="App.showView('listening')">
+        <span class="nav-icon">👂</span><span class="nav-label">听力</span>
       </div>
-    </div>
-
-    <h3 class="section-title">🏆 成就墙</h3>
-    <div class="achievements-grid" id="home-achievements"></div>
-  </div>
-
-  <!-- WORDS VIEW -->
-  <div class="view" id="view-words"></div>
-
-  <!-- READING VIEW -->
-  <div class="view" id="view-reading"></div>
-
-  <!-- LISTENING VIEW -->
-  <div class="view" id="view-listening"></div>
-
-  <!-- EXAM VIEW -->
-  <div class="view" id="view-exam"></div>
-
-  <!-- AUTHENTIC LISTENING VIEW -->
-  <div class="view" id="view-authentic"></div>
-
-  <!-- PARENT VIEW -->
-  <div class="view" id="view-parent"></div>
-
-  <!-- NAV BAR -->
-  <div class="nav-bar">
-    <div class="nav-item active" data-view="home" onclick="App.showView('home')">
-      <span class="nav-icon">🏠</span>
-      <span class="nav-label">首页</span>
-    </div>
-    <div class="nav-item" data-view="words" onclick="App.showView('words')">
-      <span class="nav-icon">📝</span>
-      <span class="nav-label">单词</span>
-    </div>
-    <div class="nav-item" data-view="reading" onclick="App.showView('reading')">
-      <span class="nav-icon">📖</span>
-      <span class="nav-label">阅读</span>
-    </div>
-    <div class="nav-item" data-view="listening" onclick="App.showView('listening')">
-      <span class="nav-icon">👂</span>
-      <span class="nav-label">听力</span>
-    </div>
-    <div class="nav-item" data-view="exam" onclick="App.showView('exam')">
-      <span class="nav-icon">🗣️</span>
-      <span class="nav-label">口语</span>
-    </div>
-    <div class="nav-item" data-view="parent" onclick="App.showView('parent')">
-      <span class="nav-icon">👨‍👩‍👦</span>
-      <span class="nav-label">家长</span>
+      <div class="nav-item" data-view="exam" onclick="App.showView('exam')">
+        <span class="nav-icon">🗣️</span><span class="nav-label">口语</span>
+      </div>
+      <div class="nav-item" data-view="parent" onclick="App.showView('parent')">
+        <span class="nav-icon">👨‍👩‍👦</span><span class="nav-label">家长</span>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Scripts -->
 <script src="data/words_v6.js"></script>
 <script src="data/words_batch2.js"></script>
 <script src="data/reading_v6.js"></script>
@@ -116,4 +173,3 @@
 
 </body>
 </html>
-<!-- trigger rebuild Sat Jul  4 11:01:49 CST 2026 -->
