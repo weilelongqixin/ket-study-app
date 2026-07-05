@@ -267,14 +267,16 @@ const App = {
     if (!this.selectedWordDay) this.selectedWordDay = currentDay;
     const day = this.selectedWordDay;
 
-    // 生成天数选择按钮
+    // 生成天数选择按钮 - 根据实际学习记录标绿
+    var wordCompletedDays = Storage.get('wordCompletedDays', {}); // {1: true, 2: true, ...}
     var dayButtons = '';
     for (var d = 1; d <= 30; d++) {
       var isCurrent = d === day;
-      var isLearned = d < currentDay;
-      var bg = isCurrent ? '#1890ff' : (isLearned ? '#e8f5e9' : '#f5f5f5');
-      var color = isCurrent ? '#fff' : (isLearned ? '#2e7d32' : '#999');
-      dayButtons += '<button onclick="App.selectWordDay(' + d + ')" style="width:36px; height:36px; border:none; border-radius:8px; background:' + bg + '; color:' + color + '; font-size:14px; font-weight:bold; cursor:pointer;">' + d + '</button>';
+      var isLearned = !!wordCompletedDays[d]; // 根据实际记录判断
+      var bg = isCurrent ? '#1890ff' : (isLearned ? '#22c55e' : '#f5f5f5');
+      var color = isCurrent ? '#fff' : (isLearned ? '#fff' : '#999');
+      var mark = isLearned ? '✓' : d;
+      dayButtons += '<button onclick="App.selectWordDay(' + d + ')" style="width:36px; height:36px; border:none; border-radius:8px; background:' + bg + '; color:' + color + '; font-size:14px; font-weight:bold; cursor:pointer;">' + mark + '</button>';
     }
 
     el.innerHTML =
@@ -443,7 +445,14 @@ const App = {
     // 记录
     const timeSpent = Math.round((Date.now() - state.startTime) / 1000);
     const stars = correct >= 4 ? 3 : correct >= 3 ? 2 : 1;
+    const examDay = this.selectedWordDay || Storage.getCurrentWordDay();
     Storage.recordSession('words', { stars, correct, total: state.total, timeSpent });
+    // 记录已完成的天数（词汇真题）
+    if (correct >= 3) {
+      var wordCompletedDays = Storage.get('wordCompletedDays', {});
+      wordCompletedDays[examDay] = true;
+      Storage.set('wordCompletedDays', wordCompletedDays);
+    }
     Storage.checkAchievements();
     this.updateHomeStats();
   },
@@ -537,6 +546,7 @@ const App = {
   finishWords() {
     const timeSpent = Math.round((Date.now() - this.wordState.startTime) / 1000);
     const stars = this.wordState.correct >= 9 ? 3 : this.wordState.correct >= 7 ? 2 : 1;
+    const completedDay = this.selectedWordDay || Storage.getCurrentWordDay();
 
     Storage.recordSession('words', {
       stars: stars,
@@ -545,8 +555,11 @@ const App = {
       timeSpent: timeSpent
     });
 
-    // Advance word day if all correct or user has seen all words
+    // 记录已完成的天数
     if (this.wordState.correct >= 7) {
+      var wordCompletedDays = Storage.get('wordCompletedDays', {});
+      wordCompletedDays[completedDay] = true;
+      Storage.set('wordCompletedDays', wordCompletedDays);
       Storage.advanceWordDay();
     }
 
