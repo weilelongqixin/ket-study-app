@@ -1,6 +1,9 @@
-// Storage Module - localStorage based data persistence
+// Storage Module - localStorage based data persistence + server sync
+const API_BASE = 'http://192.168.3.17:9090'; // 改这里切换服务器地址
+
 const Storage = {
   KEY_PREFIX: 'ket_study_',
+  _syncTimer: null,
 
   // Get data from localStorage
   get(key, defaultValue = null) {
@@ -42,6 +45,45 @@ const Storage = {
     return result;
   },
 
+  // Sync all data to server (debounced)
+  syncToServer() {
+    if (this._syncTimer) clearTimeout(this._syncTimer);
+    this._syncTimer = setTimeout(() => {
+      const data = this.getAll();
+      fetch(API_BASE + '/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).catch(() => {}); // Silent fail
+    }, 2000);
+  },
+
+  // Fetch data from server (for parent view)
+  async fetchFromServer() {
+    try {
+      const resp = await fetch(API_BASE + '/api/data', { cache: 'no-store' });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && Object.keys(data).length > 1) {
+          // Merge server data into localStorage
+          for (const key in data) {
+            if (key.startsWith('_')) continue;
+            const localVal = this.get(key);
+            const serverVal = data[key];
+            // Use server data if it has more info
+            if (JSON.stringify(serverVal) !== JSON.stringify(localVal)) {
+              this.set(key, serverVal);
+            }
+          }
+          return true;
+        }
+      }
+    } catch (e) {
+      console.log('Sync fetch failed:', e);
+    }
+    return false;
+  },
+
   // Record a study session
   recordSession(module, data) {
     const today = new Date().toISOString().split('T')[0];
@@ -55,6 +97,7 @@ const Storage = {
     this.set('sessions', sessions);
     this.updateStreak(today);
     this.addStars(data.stars || 0);
+    this.syncToServer();
   },
 
   // Update daily streak
@@ -104,6 +147,7 @@ const Storage = {
       if (mistakes.length > 200) mistakes.shift();
       this.set('mistakes', mistakes);
     }
+    this.syncToServer();
   },
 
   // Get today's study data
@@ -161,6 +205,7 @@ const Storage = {
       wordStats[word].wrong += 1;
     }
     this.set('wordStats', wordStats);
+    this.syncToServer();
   },
 
   // Get mistakes

@@ -6,9 +6,16 @@ const App = {
 
   // Initialize app
   init() {
-    this.showView('home');
-    this.updateHomeStats();
-    this.renderAchievements();
+    // Try to fetch server data on load
+    Storage.fetchFromServer().then(() => {
+      this.showView('home');
+      this.updateHomeStats();
+      this.renderAchievements();
+    }).catch(() => {
+      this.showView('home');
+      this.updateHomeStats();
+      this.renderAchievements();
+    });
   },
 
   // Navigation
@@ -1303,6 +1310,20 @@ const App = {
   },
 
   showParentPanel() {
+    // First show loading, then fetch from server
+    const el = document.getElementById('view-parent');
+    el.innerHTML = `
+      <div class="parent-login">
+        <div class="login-icon">⏳</div>
+        <h2>正在同步数据...</h2>
+      </div>
+    `;
+    Storage.fetchFromServer().then(() => {
+      this._renderParentPanel();
+    });
+  },
+
+  _renderParentPanel() {
     const stats = Storage.getStats();
     const streak = Storage.getStreak();
     const wordProgress = Storage.getWordProgress();
