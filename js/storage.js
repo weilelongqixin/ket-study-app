@@ -1,5 +1,5 @@
 // Storage Module - 服务器为主，按学生ID分别存储
-const API_BASE = 'https://nasty-hounds-grow.loca.lt';
+const API_BASE = 'https://new-steaks-beam.loca.lt';
 
 const Storage = {
   KEY_PREFIX: 'ket_study_',
