@@ -415,7 +415,11 @@ const App = {
         if (userAns) userDisplay = userAns.value;
       }
 
-      Storage.recordAnswer(isCorrect, 'words');
+      Storage.recordAnswer(isCorrect, 'words', q.q || ('第' + (qi+1) + '题'), {
+        question: q.q || '',
+        userAnswer: userDisplay || '',
+        correctAnswer: q.answer || ''
+      });
 
       html += '<div style="padding:10px; margin:6px 0; border-radius:8px; background:' + (isCorrect ? '#f6ffed' : '#fff2f0') + '; border:1px solid ' + (isCorrect ? '#b7eb8f' : '#ffa39e') + '">';
       html += '<div>' + (isCorrect ? '✅' : '❌') + ' <b>Q' + (qi+1) + '</b>. ';
@@ -513,7 +517,11 @@ const App = {
     const correct = selectedIdx === correctIdx;
     
     // 记录答题结果但不告诉孩子对错
-    Storage.recordAnswer(correct, 'words', word.word);
+    Storage.recordAnswer(correct, 'words', word.word, {
+      question: word.meaning || word.word,
+      userAnswer: selectedIdx >= 0 ? ['A','B','C','D'][selectedIdx] : '',
+      correctAnswer: ['A','B','C','D'][correctIdx]
+    });
     Storage.updateWordStat(word.word, correct);
     this.wordState.answers = this.wordState.answers || [];
     this.wordState.answers.push({ word: word.word, selected: selectedIdx, correct: correct });
@@ -809,7 +817,11 @@ const App = {
         var isCorrect = userAns === correctAns;
         if (isCorrect) correct++;
         total++;
-        Storage.recordAnswer(isCorrect, 'reading');
+        Storage.recordAnswer(isCorrect, 'reading', part.questions[qi].question || ('第' + (qi+1) + '题'), {
+          question: part.questions[qi].question || '',
+          userAnswer: userAns || '',
+          correctAnswer: correctAns || ''
+        });
 
         var container = document.querySelector('.reading-options[data-pidx="' + pi + '"][data-qidx="' + qi + '"]');
         if (container) {
@@ -1016,7 +1028,12 @@ const App = {
 
     // 记录答题
     for (var qi2 = 0; qi2 < item.questions.length; qi2++) {
-      Storage.recordAnswer(userAnswers[qi2] === item.questions[qi2].answer, 'listening');
+      var lIsCorrect = userAnswers[qi2] === item.questions[qi2].answer;
+      Storage.recordAnswer(lIsCorrect, 'listening', item.questions[qi2].question || ('第' + (qi2+1) + '题'), {
+        question: item.questions[qi2].question || '',
+        userAnswer: userAnswers[qi2] || '',
+        correctAnswer: item.questions[qi2].answer || ''
+      });
     }
 
     // 显示结果
@@ -1558,6 +1575,7 @@ const App = {
               `).join('')}
             </details>
           ` : ''}
+          <button class="btn-primary" style="width:100%;margin-top:12px;" onclick="App.showHistoryView()">📅 查看每日学习历史</button>
         </div>
       `;
     }
@@ -1668,6 +1686,10 @@ const App = {
         </div>
 
         <div class="parent-section">
+          <button class="btn-primary" style="width:100%;" onclick="App.showHistoryView()">📅 查看每日学习历史（按日查看对/错详情）</button>
+        </div>
+
+        <div class="parent-section">
           <h3>📚 词汇掌握详情</h3>
           <div class="word-progress-detail">
             <div class="word-stat-row">
@@ -1703,11 +1725,153 @@ const App = {
     URL.revokeObjectURL(url);
   },
 
+  // 当前查看的历史日期
+  _historyDate: null,
+
   confirmReset() {
     if (confirm('确定要重置所有学习数据吗？此操作不可撤销！')) {
       Storage.resetAll();
       this.showParentLogin();
     }
+  },
+
+  // ============ 每日学习历史 ============
+  showHistoryView(studentId, studentName) {
+    // 读取该学生的dailyLog
+    const data = Storage._cache || {};
+    // 如果是查看其他学生，需要从缓存中读取
+    let dailyLog = {};
+    if (studentId) {
+      // 从_parentCache或直接从Storage
+      dailyLog = (Storage._cache.dailyLog) || {};
+    } else {
+      dailyLog = Storage.get('dailyLog', {});
+    }
+    const dates = Object.keys(dailyLog).sort().reverse();
+    
+    const el = document.getElementById('view-parent');
+    let datesHtml = '';
+    if (dates.length === 0) {
+      datesHtml = '<p style="color:#999;text-align:center;padding:20px;">暂无学习记录</p>';
+    } else {
+      datesHtml = dates.map(d => {
+        const dayLog = dailyLog[d] || [];
+        const correct = dayLog.filter(e => e.correct).length;
+        const total = dayLog.length;
+        const acc = total > 0 ? Math.round(correct / total * 100) : 0;
+        const modules = [...new Set(dayLog.map(e => e.module))];
+        const wrong = total - correct;
+        const dateObj = new Date(d);
+        const weekDay = ['日','一','二','三','四','五','六'][dateObj.getDay()];
+        return `<div class="history-date-item" onclick="App.showHistoryDetail('${d}')" style="padding:12px;margin:8px 0;border-radius:10px;background:#fff;border:1px solid #eee;cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <span style="font-size:16px;font-weight:bold;">📅 ${d}</span>
+              <span style="font-size:13px;color:#999;margin-left:8px;">周${weekDay}</span>
+            </div>
+            <div style="display:flex;gap:12px;font-size:14px;">
+              <span style="color:#52c41a;">✅ ${correct}</span>
+              ${wrong > 0 ? `<span style="color:#ff4d4f;">❌ ${wrong}</span>` : ''}
+              <span style="color:#1890ff;">${acc}%</span>
+            </div>
+          </div>
+          <div style="margin-top:6px;font-size:12px;color:#999;">${modules.join(' · ')} · 共${total}题</div>
+        </div>`;
+      }).join('');
+    }
+    
+    el.innerHTML = `
+      <div class="parent-panel">
+        <div class="parent-header">
+          <h2>📅 每日学习历史 - ${studentName || ''}</h2>
+          <button class="btn-small" onclick="App.showParentLogin()">← 返回</button>
+        </div>
+        <p style="color:#666;font-size:14px;margin-bottom:12px;">点击任意日期查看当天每道题的详细对错记录</p>
+        ${datesHtml}
+      </div>
+    `;
+    el.scrollIntoView({ behavior: 'smooth' });
+  },
+
+  showHistoryDetail(dateStr) {
+    const dailyLog = Storage.get('dailyLog', {});
+    const log = dailyLog[dateStr] || [];
+    const dateObj = new Date(dateStr);
+    const weekDay = ['日','一','二','三','四','五','六'][dateObj.getDay()];
+    
+    // 按模块分组
+    const moduleGroups = {};
+    log.forEach(e => {
+      if (!moduleGroups[e.module]) moduleGroups[e.module] = [];
+      moduleGroups[e.module].push(e);
+    });
+    
+    const moduleNames = {
+      'words': '📝 单词关卡',
+      'reading': '📖 阅读理解',
+      'listening': '👂 听力练习',
+      'speaking': '🗣️ 口语训练',
+      'authentic_listening': '🎧 真题听力'
+    };
+    
+    let detailHtml = '';
+    Object.keys(moduleGroups).forEach(mod => {
+      const entries = moduleGroups[mod];
+      const correct = entries.filter(e => e.correct).length;
+      const wrong = entries.length - correct;
+      detailHtml += `
+        <div style="margin:12px 0;padding:12px;border-radius:10px;background:#f8fafc;border:1px solid #e8e8e8;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h4 style="margin:0;color:#1890ff;">${moduleNames[mod] || mod}</h4>
+            <span style="font-size:14px;">✅ ${correct} / ❌ ${wrong} (${entries.length}题)</span>
+          </div>
+          <div style="display:grid;gap:4px;">
+            ${entries.map((e, i) => `
+              <div style="padding:8px;border-radius:6px;background:${e.correct ? '#f6ffed' : '#fff2f0'};border:1px solid ${e.correct ? '#b7eb8f' : '#ffccc7'};font-size:13px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <span style="margin-right:6px;">${e.correct ? '✅' : '❌'}</span>
+                    <span style="font-weight:bold;">${e.word || '第' + (i+1) + '题'}</span>
+                  </div>
+                  ${!e.correct && e.correctAnswer ? `<span style="color:#999;font-size:12px;">正确答案: ${e.correctAnswer}</span>` : ''}
+                </div>
+                ${e.question ? `<div style="color:#666;font-size:12px;margin-top:2px;">${e.question}</div>` : ''}
+                ${!e.correct && e.userAnswer ? `<div style="color:#ff4d4f;font-size:12px;">你的答案: ${e.userAnswer}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    });
+    
+    if (!detailHtml) detailHtml = '<p style="color:#999;text-align:center;padding:20px;">当天无学习记录</p>';
+    
+    const correct = log.filter(e => e.correct).length;
+    const total = log.length;
+    const acc = total > 0 ? Math.round(correct / total * 100) : 0;
+    
+    const el = document.getElementById('view-parent');
+    el.innerHTML = `
+      <div class="parent-panel">
+        <div class="parent-header">
+          <h2>📅 ${dateStr} (周${weekDay}) 详情</h2>
+          <button class="btn-small" onclick="App.showHistoryView()">← 返回历史列表</button>
+        </div>
+        <div style="padding:12px;background:#e3f2fd;border-radius:10px;margin-bottom:12px;">
+          <div style="display:flex;gap:20px;font-size:15px;">
+            <span>📊 总共 <b>${total}</b> 题</span>
+            <span style="color:#52c41a;">✅ 答对 <b>${correct}</b></span>
+            <span style="color:#ff4d4f;">❌ 答错 <b>${total - correct}</b></span>
+            <span style="color:#1890ff;">正确率 <b>${acc}%</b></span>
+          </div>
+        </div>
+        ${detailHtml}
+        <div style="text-align:center;margin-top:15px;">
+          <button class="btn-secondary" onclick="App.showHistoryView()">← 返回历史列表</button>
+        </div>
+      </div>
+    `;
+    el.scrollIntoView({ behavior: 'smooth' });
   },
 
   // ============ UTILITIES ============

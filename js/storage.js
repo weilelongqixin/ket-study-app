@@ -121,17 +121,68 @@ const Storage = {
     this.checkAchievements();
   },
 
-  recordAnswer(correct, module, word = null) {
+  recordAnswer(correct, module, word = null, detail = null) {
+    const today = new Date().toISOString().split('T')[0];
     const stats = this.get('stats', { totalStars: 0, totalCorrect: 0, totalQuestions: 0 });
     stats.totalQuestions += 1;
     if (correct) stats.totalCorrect += 1;
     this.set('stats', stats);
+
+    // 保存每道题的详细记录（用于家长端按日查看）
+    const dailyLog = this.get('dailyLog', {});
+    if (!dailyLog[today]) dailyLog[today] = [];
+    const entry = {
+      module,
+      word: word || '',
+      correct: !!correct,
+      timestamp: Date.now()
+    };
+    if (detail) {
+      entry.question = detail.question || '';
+      entry.userAnswer = detail.userAnswer || '';
+      entry.correctAnswer = detail.correctAnswer || '';
+    }
+    dailyLog[today].push(entry);
+    // 保留最近90天
+    const dates = Object.keys(dailyLog).sort();
+    while (dates.length > 90) {
+      delete dailyLog[dates.shift()];
+    }
+    this.set('dailyLog', dailyLog);
+
     if (!correct) {
       const mistakes = this.get('mistakes', []);
-      mistakes.push({ module, word, date: new Date().toISOString().split('T')[0], timestamp: Date.now() });
+      mistakes.push({ module, word, date: today, timestamp: Date.now() });
       if (mistakes.length > 200) mistakes.shift();
       this.set('mistakes', mistakes);
     }
+  },
+
+  // 按日期获取每道题的详细记录
+  getDailyLog(dateStr) {
+    const dailyLog = this.get('dailyLog', {});
+    return dailyLog[dateStr] || [];
+  },
+
+  // 获取所有有学习记录的日期列表
+  getStudyDates() {
+    const dailyLog = this.get('dailyLog', {});
+    return Object.keys(dailyLog).sort().reverse();
+  },
+
+  // 获取某天的学习汇总
+  getDailySummary(dateStr) {
+    const log = this.getDailyLog(dateStr);
+    if (!log.length) return null;
+    const modules = {};
+    let correct = 0, total = 0;
+    log.forEach(e => {
+      if (!modules[e.module]) modules[e.module] = { correct: 0, total: 0 };
+      modules[e.module].total++;
+      if (e.correct) { modules[e.module].correct++; correct++; }
+      total++;
+    });
+    return { date: dateStr, correct, total, accuracy: total > 0 ? Math.round(correct / total * 100) : 0, modules, details: log };
   },
 
   getTodayData() {
