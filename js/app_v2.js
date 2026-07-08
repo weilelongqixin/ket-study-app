@@ -1478,21 +1478,23 @@ const App = {
   },
 
   async _loadAllStudents() {
+    const FIREBASE_URL = 'https://ket-study-default-rtdb.firebaseio.com';
     const students = [
       { id: 'student1', name: '👦 大宝' },
       { id: 'student2', name: '👧 二宝' }
     ];
     
-    // 从服务器拉每个学生的数据
+    // 从Firebase直接拉每个学生的完整数据
     for (const s of students) {
       try {
-        const resp = await fetch(API_BASE + '/api/data?studentId=' + s.id, { cache: 'no-store' });
+        const resp = await fetch(FIREBASE_URL + '/students/' + s.id + '.json', { cache: 'no-store' });
         if (resp.ok) {
           const data = await resp.json();
-          s.data = data;
+          s.data = data || {};
         }
-      } catch(e) {}
+      } catch(e) { console.log('[KET] 加载' + s.id + '数据失败:', e.message); }
     }
+    this._parentStudentsData = students; // 缓存供历史查看用
     this._renderParentPanelAll(students);
   },
 
@@ -1575,7 +1577,7 @@ const App = {
               `).join('')}
             </details>
           ` : ''}
-          <button class="btn-primary" style="width:100%;margin-top:12px;" onclick="App.showHistoryView()">📅 查看每日学习历史</button>
+          <button class="btn-primary" style="width:100%;margin-top:12px;" onclick="App.showHistoryView('${s.id}', '${s.name}')">📅 查看每日学习历史</button>
         </div>
       `;
     }
@@ -1737,14 +1739,22 @@ const App = {
 
   // ============ 每日学习历史 ============
   showHistoryView(studentId, studentName) {
-    // 读取该学生的dailyLog
-    const data = Storage._cache || {};
-    // 如果是查看其他学生，需要从缓存中读取
+    // 家长端：从已加载的学生数据中读取dailyLog
+    // 支持多学生：如果指定了studentId就用对应的，否则默认用student1
     let dailyLog = {};
-    if (studentId) {
-      // 从_parentCache或直接从Storage
-      dailyLog = (Storage._cache.dailyLog) || {};
+    let displayName = studentName || '';
+    
+    if (this._parentStudentsData) {
+      // 从家长端缓存的学生数据中找
+      const target = studentId 
+        ? this._parentStudentsData.find(s => s.id === studentId)
+        : this._parentStudentsData[0]; // 默认第一个（大宝）
+      if (target && target.data) {
+        dailyLog = target.data.dailyLog || {};
+        displayName = displayName || target.name;
+      }
     } else {
+      // 学生端fallback：从本地Storage读
       dailyLog = Storage.get('dailyLog', {});
     }
     const dates = Object.keys(dailyLog).sort().reverse();
@@ -1794,7 +1804,14 @@ const App = {
   },
 
   showHistoryDetail(dateStr) {
-    const dailyLog = Storage.get('dailyLog', {});
+    // 家长端从缓存学生数据读取，学生端从Storage读取
+    let dailyLog = {};
+    if (this._parentStudentsData) {
+      const target = this._parentStudentsData[0];
+      dailyLog = (target && target.data && target.data.dailyLog) || {};
+    } else {
+      dailyLog = Storage.get('dailyLog', {});
+    }
     const log = dailyLog[dateStr] || [];
     const dateObj = new Date(dateStr);
     const weekDay = ['日','一','二','三','四','五','六'][dateObj.getDay()];
