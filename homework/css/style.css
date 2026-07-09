@@ -1,0 +1,948 @@
+/* =================== 全局样式 =================== */
+:root {
+  --primary: #4CAF50;
+  --primary-light: #81C784;
+  --primary-dark: #388E3C;
+  --primary-bg: #E8F5E9;
+  --primary-bg-light: #F1F8E9;
+  --secondary: #FF9800;
+  --danger: #f44336;
+  --text-main: #333;
+  --text-sub: #666;
+  --text-light: #999;
+  --bg: #F5F7FA;
+  --card-bg: #fff;
+  --border: #e0e0e0;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text-main);
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding-bottom: 70px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+img {
+  max-width: 100%;
+}
+
+/* =================== 视图容器 =================== */
+.view {
+  display: none;
+  padding: 12px;
+}
+
+.view.active {
+  display: block;
+}
+
+/* =================== 卡片 =================== */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+
+/* =================== 日期卡片 =================== */
+.date-card {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  text-align: center;
+}
+
+.date-text {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.streak-badge {
+  font-size: 16px;
+  opacity: 0.95;
+}
+
+.streak-num {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 4px;
+}
+
+/* =================== 统计卡片 =================== */
+.stats-card, .stats-overview {
+  background: white;
+}
+
+.stats-title, .stats-overview-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-main);
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+}
+
+.stats-item {
+  text-align: center;
+}
+
+.stats-num {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.stats-label {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+/* =================== 科目卡片 =================== */
+.subject-card {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.subject-card:active {
+  transform: scale(0.98);
+}
+
+.subject-card.done {
+  background: var(--primary-bg);
+}
+
+.subject-icon {
+  font-size: 36px;
+  margin-right: 14px;
+}
+
+.subject-info {
+  flex: 1;
+}
+
+.subject-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.subject-sub {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.subject-status {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* =================== 鼓励语 =================== */
+.encourage-card {
+  background: var(--primary-bg-light);
+  text-align: center;
+  border: 1px dashed var(--primary-light);
+}
+
+.encourage-text {
+  font-size: 16px;
+  color: var(--primary-dark);
+  font-weight: 500;
+}
+
+/* =================== 小标题 =================== */
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-sub);
+  margin: 16px 0 8px;
+  padding-left: 4px;
+}
+
+/* =================== 科目Tab =================== */
+.subject-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.subject-tab {
+  flex: 1;
+  padding: 12px;
+  font-size: 16px;
+  border: 2px solid var(--border);
+  background: white;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+  color: var(--text-sub);
+}
+
+.subject-tab.active {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+  color: var(--primary-dark);
+}
+
+/* =================== 下拉选择 =================== */
+.lesson-select,
+.custom-lesson {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  margin-bottom: 10px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  cursor: pointer;
+}
+
+.lesson-select:focus,
+.custom-lesson:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.custom-lesson {
+  background-image: none;
+  cursor: text;
+}
+
+/* =================== 拍照区域 =================== */
+.camera-area {
+  margin-bottom: 14px;
+}
+
+.camera-label {
+  display: block;
+  cursor: pointer;
+}
+
+.camera-placeholder {
+  border: 2.5px dashed var(--primary-light);
+  border-radius: var(--radius);
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--primary);
+  background: var(--primary-bg-light);
+  transition: all 0.2s;
+}
+
+.camera-placeholder:active {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.camera-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.camera-placeholder > div:last-child {
+  font-size: 15px;
+  color: var(--text-sub);
+}
+
+/* =================== 图片预览 =================== */
+.image-preview {
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.image-preview img {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  margin-bottom: 8px;
+}
+
+/* =================== 按钮 =================== */
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  font-family: inherit;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:active {
+  background: var(--primary-dark);
+}
+
+.btn-secondary {
+  background: #E0E0E0;
+  color: var(--text-sub);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-large {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  font-size: 17px;
+  border-radius: var(--radius-sm);
+  margin-top: 10px;
+}
+
+.btn-small {
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+/* =================== 参考答案提示 =================== */
+.answer-hint-card {
+  padding: 12px 16px;
+}
+
+.answer-hint-card.warning {
+  background: #FFF8E1;
+  border: 1px solid #FFE082;
+}
+
+.answer-hint-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.answer-hint-count {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+.answer-hint-sub {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin-top: 4px;
+}
+
+/* =================== 加载中 =================== */
+.loading-card {
+  text-align: center;
+  padding: 30px 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--primary-bg);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: var(--text-sub);
+  font-size: 15px;
+}
+
+/* =================== 批改结果 =================== */
+.result-card {
+  background: white;
+}
+
+.result-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.result-sub {
+  font-size: 14px;
+  color: var(--text-sub);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+/* 逐题批改列表 */
+.grading-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.grading-item.unmarked {
+  background: #FAFAFA;
+}
+
+.grading-item.marked-correct {
+  background: var(--primary-bg);
+  border-color: var(--primary-light);
+}
+
+.grading-item.marked-wrong {
+  background: #FFEBEE;
+  border-color: #EF9A9A;
+}
+
+.grading-q {
+  font-weight: 600;
+  font-size: 16px;
+  min-width: 60px;
+}
+
+.grading-a {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-sub);
+}
+
+.grading-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.grading-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.correct-btn {
+  background: var(--primary-bg);
+  color: var(--primary-dark);
+}
+
+.wrong-btn {
+  background: #FFEBEE;
+  color: var(--danger);
+}
+
+/* 手动输入 */
+.manual-input-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.manual-input-row label {
+  font-size: 15px;
+  font-weight: 500;
+  min-width: 70px;
+}
+
+.manual-input {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 16px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+}
+
+.manual-textarea {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  min-height: 80px;
+  margin-bottom: 12px;
+  font-family: inherit;
+}
+
+/* 结果总结 */
+.result-summary {
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.result-summary.good {
+  background: linear-gradient(135deg, var(--primary-bg-light) 0%, var(--primary-bg) 100%);
+}
+
+.result-summary.need-improve {
+  background: linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%);
+}
+
+.result-emoji {
+  font-size: 56px;
+  margin-bottom: 8px;
+}
+
+.result-score {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.result-rate {
+  font-size: 16px;
+  color: var(--text-sub);
+  margin-top: 4px;
+}
+
+.result-praise {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--primary-dark);
+  margin-top: 12px;
+}
+
+.result-wrong {
+  font-size: 14px;
+  color: var(--secondary);
+  margin-top: 8px;
+}
+
+.result-perfect {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-top: 8px;
+}
+
+/* =================== 记录页 =================== */
+.stats-overview {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+}
+
+.stats-overview .stats-overview-title {
+  color: white;
+  margin-bottom: 16px;
+}
+
+.stats-overview .stats-num {
+  color: white;
+  font-size: 22px;
+}
+
+.stats-overview .stats-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.record-day-card {
+  padding: 14px 16px;
+}
+
+.record-day-card.empty {
+  background: #FAFAFA;
+  opacity: 0.7;
+}
+
+.record-date {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-main);
+}
+
+.record-empty {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+.record-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--bg);
+}
+
+.record-item-header {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-subject {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.record-lesson {
+  font-size: 12px;
+  color: var(--text-light);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-item-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-text {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.rate-badge {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rate-good {
+  background: var(--primary-bg);
+  color: var(--primary-dark);
+}
+
+.rate-ok {
+  background: #FFF8E1;
+  color: #F57C00;
+}
+
+.rate-bad {
+  background: #FFEBEE;
+  color: var(--danger);
+}
+
+/* =================== 空状态 =================== */
+.empty-hint {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-hint > div:nth-child(2) {
+  font-size: 16px;
+  color: var(--text-sub);
+}
+
+.empty-sub {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 4px;
+}
+
+/* =================== 答案管理 =================== */
+.answers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.unlock-card {
+  text-align: center;
+  padding: 40px 20px;
+  margin-top: 40px;
+}
+
+.unlock-icon {
+  font-size: 56px;
+  margin-bottom: 12px;
+}
+
+.unlock-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.unlock-sub {
+  font-size: 14px;
+  color: var(--text-sub);
+  margin-bottom: 20px;
+}
+
+.password-input {
+  width: 100%;
+  max-width: 200px;
+  padding: 14px;
+  font-size: 24px;
+  text-align: center;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  letter-spacing: 12px;
+  margin-bottom: 16px;
+  font-family: inherit;
+}
+
+.password-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.answer-form-card {
+  /* form card */
+}
+
+.form-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.form-label {
+  font-size: 14px;
+  color: var(--text-sub);
+  margin-bottom: 6px;
+  margin-top: 10px;
+}
+
+.answer-textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 12px;
+  font-size: 15px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.8;
+}
+
+.answer-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.answer-list-card {
+  padding: 14px 16px;
+}
+
+.answer-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.answer-list-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.answer-list-count {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-bottom: 8px;
+}
+
+.answer-list-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.success-msg {
+  background: var(--primary-bg);
+  color: var(--primary-dark);
+  text-align: center;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.error-card {
+  background: #FFEBEE;
+  text-align: center;
+}
+
+.error-detail {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin-top: 8px;
+}
+
+.notes-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.notes-content {
+  font-size: 14px;
+  color: var(--text-sub);
+  white-space: pre-wrap;
+}
+
+/* =================== 底部导航 =================== */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  background: white;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  z-index: 100;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: color 0.2s;
+  font-size: 11px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-item.active {
+  color: var(--primary);
+}
+
+.tab-icon {
+  font-size: 22px;
+}
+
+.tab-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* =================== 页面标题 =================== */
+.app-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  text-align: center;
+  padding: 14px 12px;
+  font-size: 17px;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+/* =================== 响应式 =================== */
+@media (max-width: 360px) {
+  body {
+    font-size: 14px;
+  }
+  .subject-icon {
+    font-size: 30px;
+  }
+  .subject-name {
+    font-size: 18px;
+  }
+  .stats-num {
+    font-size: 20px;
+  }
+  .result-score {
+    font-size: 34px;
+  }
+  .result-emoji {
+    font-size: 46px;
+  }
+}
+
+/* =================== 今日进度条 =================== */
+.today-progress-card {
+  padding: 14px 16px;
+}
+.progress-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.progress-bar-wrap {
+  width: 100%;
+  height: 10px;
+  background: #E0E0E0;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--primary-light));
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+/* =================== 周末卡片 =================== */
+.weekend-card {
+  background: linear-gradient(135deg, #fff9c4, #fff3e0);
+  text-align: center;
+  padding: 30px 20px;
+}
+
+/* 安全区域适配 */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+}

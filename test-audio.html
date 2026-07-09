@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>听力测试</title>
+</head>
+<body>
+<h2>听力播放测试</h2>
+
+<audio id="player" controls preload="auto" style="width:100%; max-width:500px;">
+  <source src="assets/audio/listening_1.mp3" type="audio/mpeg">
+  您的浏览器不支持音频播放
+</audio>
+
+<hr>
+
+<button onclick="playAudio(1)" style="font-size:20px; padding:15px 30px; margin:10px;">▶️ 播放第1段</button>
+<button onclick="playAudio(2)" style="font-size:20px; padding:15px 30px; margin:10px;">▶️ 播放第2段</button>
+<button onclick="document.getElementById('player').pause()" style="font-size:20px; padding:15px 30px; margin:10px;">⏹️ 停止</button>
+
+<p id="status" style="font-size:18px; color:blue;">点击按钮测试</p>
+
+<script>
+function playAudio(id) {
+  var player = document.getElementById('player');
+  var src = 'assets/audio/listening_' + id + '.mp3';
+  player.src = src;
+  document.getElementById('status').textContent = '正在加载: ' + src;
+  
+  player.oncanplay = function() {
+    document.getElementById('status').textContent = '音频已加载，正在播放...';
+  };
+  
+  player.onplaying = function() {
+    document.getElementById('status').textContent = '✅ 正在播放第' + id + '段！';
+  };
+  
+  player.onerror = function(e) {
+    document.getElementById('status').textContent = '❌ 加载失败: ' + src;
+    console.error('Audio error:', e, player.error);
+  };
+  
+  player.onended = function() {
+    document.getElementById('status').textContent = '播放结束';
+  };
+  
+  player.play().then(function() {
+    document.getElementById('status').textContent = '▶️ play()成功！';
+  }).catch(function(err) {
+    document.getElementById('status').textContent = '❌ play()失败: ' + err.message;
+    console.error('Play failed:', err);
+  });
+}
+</script>
+</body>
+</html>

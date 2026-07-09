@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#4CAF50">
+  <meta name="version" content="2026-07-04-v2">
+  <title>学习打卡·AI批改</title>
+  <link rel="stylesheet" href="css/style.css?v=20260705v4">
+</head>
+<body>
+
+  <!-- 顶部标题栏 -->
+  <div class="app-header">📚 学习打卡 · AI批改</div>
+
+  <!-- ========== 打卡首页 ========== -->
+  <div class="view active" id="view-home">
+    <div id="home-content"></div>
+  </div>
+
+  <!-- ========== 拍照页 ========== -->
+  <div class="view" id="view-camera">
+    <div id="camera-content"></div>
+  </div>
+
+  <!-- ========== 记录页 ========== -->
+  <div class="view" id="view-records">
+    <div id="records-content"></div>
+  </div>
+
+  <!-- ========== 答案管理 ========== -->
+  <div class="view" id="view-answers">
+    <div id="answers-content"></div>
+  </div>
+
+  <!-- ========== 底部导航 ========== -->
+  <nav class="bottom-nav">
+    <div class="tab-item active" data-view="home">
+      <span class="tab-icon">📚</span>
+      <span class="tab-label">打卡</span>
+    </div>
+    <div class="tab-item" data-view="camera">
+      <span class="tab-icon">📸</span>
+      <span class="tab-label">拍照</span>
+    </div>
+    <div class="tab-item" data-view="records">
+      <span class="tab-icon">📊</span>
+      <span class="tab-label">记录</span>
+    </div>
+    <div class="tab-item" data-view="answers">
+      <span class="tab-icon">⚙️</span>
+      <span class="tab-label">答案管理</span>
+    </div>
+  </nav>
+
+  <!-- 脚本 -->
+  <script src="data/lessons.js?v=20260705v4"></script>
+  <script src="js/storage.js?v=20260705v4"></script>
+  <script src="js/app.js?v=20260705v4"></script>
+</body>
+</html>

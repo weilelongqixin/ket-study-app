@@ -1,0 +1,3 @@
+assets/audio/
+*.bak
+server.py
