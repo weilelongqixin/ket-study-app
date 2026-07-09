@@ -4,11 +4,48 @@ const App = {
   speechSynthesis: window.speechSynthesis || null,
   selectedSpeechRate: 0.9,
 
-  // Initialize app
+  // Initialize app - check if logged in
   init() {
-    this.showView('home');
-    this.updateHomeStats();
-    this.renderAchievements();
+    const savedId = Storage.getStudentId();
+    if (savedId) {
+      // 已登录，直接进主应用
+      const names = { 'student1': '大宝', 'student2': '二宝', 'parent': '家长' };
+      Storage.setStudent(savedId, names[savedId] || savedId);
+      this.enterApp();
+    }
+    // 否则显示登录选学生页面
+  },
+
+  // 学生登录
+  login(id, name) {
+    Storage.setStudent(id, name);
+    this.enterApp();
+  },
+
+  // 进入主应用
+  enterApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    const badge = document.getElementById('student-badge');
+    const sid = Storage.getStudentId();
+    const names = { 'student1': '👦 大宝', 'student2': '👧 二宝', 'parent': '👨‍👩‍👦 家长' };
+    if (badge) badge.textContent = names[sid] || sid;
+
+    if (sid === 'parent') {
+      // 家长直接看面板
+      this.showView('parent');
+    } else {
+      // 学生先从服务器拉数据再显示
+      Storage.fetchFromServer().then(() => {
+        this.showView('home');
+        this.updateHomeStats();
+        this.renderAchievements();
+      }).catch(() => {
+        this.showView('home');
+        this.updateHomeStats();
+        this.renderAchievements();
+      });
+    }
   },
 
   // Navigation
@@ -53,17 +90,42 @@ const App = {
     const streak = Storage.getStreak();
     const wordProgress = Storage.getWordProgress();
     const todayData = Storage.getTodayData();
+    const allModules = ['words', 'reading', 'listening', 'authentic', 'exam'];
 
     const el = document.getElementById('home-stats');
     if (!el) return;
 
     const todayStars = todayData.reduce((s, d) => s + (d.stars || 0), 0);
-    const todayModules = new Set(todayData.map(d => d.module)).size;
+    const completedToday = new Set(todayData.map(d => d.module));
+    const todayModuleCount = completedToday.size;
+    const totalModules = allModules.length;
     const accuracy = stats.totalQuestions > 0
       ? Math.round(stats.totalCorrect / stats.totalQuestions * 100)
       : 0;
+    const progressPercent = Math.round(todayModuleCount / totalModules * 100);
+
+    // 鼓励语
+    let encourage = '';
+    if (progressPercent === 0) encourage = '准备好开始今天的学习了吗？💪';
+    else if (progressPercent < 40) encourage = '不错！继续加油鸭~ 🦆';
+    else if (progressPercent < 80) encourage = '太棒了！马上就全部完成啦！🎉';
+    else if (progressPercent < 100) encourage = '就差一点点！冲鸭！🚀';
+    else encourage = '全部完成！你是学习小冠军！🏆';
 
     el.innerHTML = `
+      <!-- 今日进度条 -->
+      <div class="today-progress-wrap">
+        <div class="today-progress-header">
+          <span class="today-progress-title">📅 今日进度</span>
+          <span class="today-progress-count">${todayModuleCount}/${totalModules}</span>
+        </div>
+        <div class="today-progress-bar-bg">
+          <div class="today-progress-bar-fill" style="width:${progressPercent}%"></div>
+        </div>
+        <div class="today-progress-encourage">${encourage}</div>
+      </div>
+
+      <!-- 数据统计 -->
       <div class="stats-grid">
         <div class="stat-card stat-stars">
           <div class="stat-icon">⭐</div>
@@ -86,12 +148,84 @@ const App = {
           <div class="stat-label">已掌握单词</div>
         </div>
       </div>
+
+      <!-- 今日获得 -->
+      ${todayModuleCount > 0 ? `
       <div class="today-banner">
-        ${todayModules > 0
-          ? `✅ 今天已完成 ${todayModules} 个模块，获得 ${todayStars} ⭐`
-          : '👋 今天还没开始学习哦，加油！'}
+        ✅ 今天已完成 ${todayModuleCount} 个模块，获得 ${todayStars} ⭐
       </div>
+      ` : ''}
     `;
+
+    // 标记今天已完成的模块卡片为绿色
+    this._markCompletedModules(todayData);
+  },
+
+  _markCompletedModules(todayData) {
+    // 获取今天已完成的模块名集合
+    const completedModules = new Set(todayData.map(d => d.module));
+    
+    // 模块名到卡片onclick的映射
+    const moduleMap = {
+      'words': 'words',
+      '单词': 'words',
+      'reading': 'reading',
+      '阅读': 'reading',
+      'listening': 'listening',
+      '听力': 'listening',
+      'exam': 'exam',
+      '口语': 'exam',
+      'speaking': 'exam',
+      'authentic': 'authentic',
+      '真题听力': 'authentic'
+    };
+    
+    const completedViews = new Set();
+    completedModules.forEach(m => {
+      const view = moduleMap[m];
+      if (view) completedViews.add(view);
+    });
+    
+    // 遍历所有模块卡片，标记已完成
+    const cards = document.querySelectorAll('.module-card');
+    cards.forEach(card => {
+      // 获取卡片的onclick里的view名
+      const onclick = card.getAttribute('onclick') || '';
+      const match = onclick.match(/showView\(['"]([^'"]+)['"]\)/);
+      const viewName = match ? match[1] : '';
+      
+      // 移除旧标记
+      card.style.border = '';
+      card.style.background = '';
+      card.style.opacity = '';
+      
+      // 找到名字元素和时间元素
+      const nameEl = card.querySelector('.module-name');
+      const timeEl = card.querySelector('.module-time');
+      
+      // 移除旧的完成标记
+      const oldBadge = card.querySelector('.done-badge');
+      if (oldBadge) oldBadge.remove();
+      
+      if (completedViews.has(viewName)) {
+        // 标记为已完成：绿色边框+背景+✅标记
+        card.style.border = '2px solid #22c55e';
+        card.style.background = 'linear-gradient(135deg,#f0fdf4,#dcfce7)';
+        if (timeEl) {
+ timeEl.innerHTML = '✅ 今天已完成';
+          timeEl.style.color = '#16a34a';
+          timeEl.style.fontWeight = 'bold';
+        }
+      } else {
+        // 恢复原始时间文字
+        if (timeEl) {
+          timeEl.style.color = '';
+          timeEl.style.fontWeight = '';
+          const def = timeEl.getAttribute('data-default');
+          if (def) timeEl.innerHTML = def;
+        }
+      }
+    });
   },
 
   renderAchievements() {
@@ -133,14 +267,16 @@ const App = {
     if (!this.selectedWordDay) this.selectedWordDay = currentDay;
     const day = this.selectedWordDay;
 
-    // 生成天数选择按钮
+    // 生成天数选择按钮 - 根据实际学习记录标绿
+    var wordCompletedDays = Storage.get('wordCompletedDays', {}); // {1: true, 2: true, ...}
     var dayButtons = '';
-    for (var d = 1; d <= 15; d++) {
+    for (var d = 1; d <= 30; d++) {
       var isCurrent = d === day;
-      var isLearned = d < currentDay;
-      var bg = isCurrent ? '#1890ff' : (isLearned ? '#e8f5e9' : '#f5f5f5');
-      var color = isCurrent ? '#fff' : (isLearned ? '#2e7d32' : '#999');
-      dayButtons += '<button onclick="App.selectWordDay(' + d + ')" style="width:36px; height:36px; border:none; border-radius:8px; background:' + bg + '; color:' + color + '; font-size:14px; font-weight:bold; cursor:pointer;">' + d + '</button>';
+      var isLearned = !!wordCompletedDays[d]; // 根据实际记录判断
+      var bg = isCurrent ? '#1890ff' : (isLearned ? '#22c55e' : '#f5f5f5');
+      var color = isCurrent ? '#fff' : (isLearned ? '#fff' : '#999');
+      var mark = isLearned ? '✓' : d;
+      dayButtons += '<button onclick="App.selectWordDay(' + d + ')" style="width:36px; height:36px; border:none; border-radius:8px; background:' + bg + '; color:' + color + '; font-size:14px; font-weight:bold; cursor:pointer;">' + mark + '</button>';
     }
 
     el.innerHTML =
@@ -173,15 +309,19 @@ const App = {
 
   startWordMemorize() {
     const day = this.selectedWordDay || Storage.getCurrentWordDay();
-    const dayWords = KET_WORDS.filter(w => w.day === day);
-    const wordGlobalIndices = dayWords.map(w => KET_WORDS.indexOf(w) + 1);
+    // Day 1-15用第一批，Day 16-30用第二批
+    var allWords = (typeof KET_WORDS_BATCH2 !== 'undefined') ? KET_WORDS.concat(KET_WORDS_BATCH2) : KET_WORDS;
+    const dayWords = allWords.filter(w => w.day === day);
+    const wordGlobalIndices = dayWords.map(w => allWords.indexOf(w) + 1);
     this.wordState = { index: 0, words: dayWords, globalIndices: wordGlobalIndices, mode: 'select', correct: 0, total: dayWords.length, startTime: Date.now() };
     this.renderWordQuestion();
   },
 
   startWordExam() {
     const day = this.selectedWordDay || Storage.getCurrentWordDay();
-    const dayQuestions = KET_WORD_QUESTIONS.find(q => q.day === day);
+    // Day 1-15用第一批，Day 16-30用第二批
+    var allQuestions = (typeof KET_WORD_QUESTIONS_BATCH2 !== 'undefined') ? KET_WORD_QUESTIONS.concat(KET_WORD_QUESTIONS_BATCH2) : KET_WORD_QUESTIONS;
+    const dayQuestions = allQuestions.find(q => q.day === day);
     if (!dayQuestions) {
       const el = document.getElementById('view-words');
       el.innerHTML = '<div style="text-align:center; padding:40px;"><p>暂无Day ' + day + '的词汇真题</p><button class="btn-secondary" onclick="App.startWords()">← 返回</button></div>';
@@ -275,7 +415,11 @@ const App = {
         if (userAns) userDisplay = userAns.value;
       }
 
-      Storage.recordAnswer(isCorrect, 'words');
+      Storage.recordAnswer(isCorrect, 'words', q.q || ('第' + (qi+1) + '题'), {
+        question: q.q || '',
+        userAnswer: userDisplay || '',
+        correctAnswer: q.answer || ''
+      });
 
       html += '<div style="padding:10px; margin:6px 0; border-radius:8px; background:' + (isCorrect ? '#f6ffed' : '#fff2f0') + '; border:1px solid ' + (isCorrect ? '#b7eb8f' : '#ffa39e') + '">';
       html += '<div>' + (isCorrect ? '✅' : '❌') + ' <b>Q' + (qi+1) + '</b>. ';
@@ -305,7 +449,14 @@ const App = {
     // 记录
     const timeSpent = Math.round((Date.now() - state.startTime) / 1000);
     const stars = correct >= 4 ? 3 : correct >= 3 ? 2 : 1;
+    const examDay = this.selectedWordDay || Storage.getCurrentWordDay();
     Storage.recordSession('words', { stars, correct, total: state.total, timeSpent });
+    // 记录已完成的天数（词汇真题）
+    if (correct >= 3) {
+      var wordCompletedDays = Storage.get('wordCompletedDays', {});
+      wordCompletedDays[examDay] = true;
+      Storage.set('wordCompletedDays', wordCompletedDays);
+    }
     Storage.checkAchievements();
     this.updateHomeStats();
   },
@@ -325,7 +476,8 @@ const App = {
 
     if (this.wordState.mode === 'select') {
       // Generate 4 options including the correct translation
-      const otherTranslations = KET_WORDS
+      var allWordsForOptions = (typeof KET_WORDS_BATCH2 !== 'undefined') ? KET_WORDS.concat(KET_WORDS_BATCH2) : KET_WORDS;
+      const otherTranslations = allWordsForOptions
         .filter(w => w.word !== word.word)
         .map(w => w.translation)
         .sort(() => Math.random() - 0.5)
@@ -365,7 +517,11 @@ const App = {
     const correct = selectedIdx === correctIdx;
     
     // 记录答题结果但不告诉孩子对错
-    Storage.recordAnswer(correct, 'words', word.word);
+    Storage.recordAnswer(correct, 'words', word.word, {
+      question: word.meaning || word.word,
+      userAnswer: selectedIdx >= 0 ? ['A','B','C','D'][selectedIdx] : '',
+      correctAnswer: ['A','B','C','D'][correctIdx]
+    });
     Storage.updateWordStat(word.word, correct);
     this.wordState.answers = this.wordState.answers || [];
     this.wordState.answers.push({ word: word.word, selected: selectedIdx, correct: correct });
@@ -398,6 +554,7 @@ const App = {
   finishWords() {
     const timeSpent = Math.round((Date.now() - this.wordState.startTime) / 1000);
     const stars = this.wordState.correct >= 9 ? 3 : this.wordState.correct >= 7 ? 2 : 1;
+    const completedDay = this.selectedWordDay || Storage.getCurrentWordDay();
 
     Storage.recordSession('words', {
       stars: stars,
@@ -406,8 +563,11 @@ const App = {
       timeSpent: timeSpent
     });
 
-    // Advance word day if all correct or user has seen all words
+    // 记录已完成的天数
     if (this.wordState.correct >= 7) {
+      var wordCompletedDays = Storage.get('wordCompletedDays', {});
+      wordCompletedDays[completedDay] = true;
+      Storage.set('wordCompletedDays', wordCompletedDays);
       Storage.advanceWordDay();
     }
 
@@ -484,7 +644,7 @@ const App = {
 
     // 生成天数选择按钮
     var dayButtons = '';
-    for (var d = 1; d <= 15; d++) {
+    for (var d = 1; d <= 30; d++) {
       var isCurrent = d === day;
       var isLearned = d < currentDay;
       var bg = isCurrent ? '#1890ff' : (isLearned ? '#e8f5e9' : '#f5f5f5');
@@ -511,8 +671,9 @@ const App = {
     html += '<div style="margin-top:15px; padding:10px; background:#fafafa; border-radius:10px;">';
     html += '<div style="font-size:13px; color:#888; margin-bottom:8px;">💪 想挑战更多？完整做一套：</div>';
     html += '<div style="display:grid; gap:8px;">';
-    for (var i = 0; i < KET_READING.length; i++) {
-      var test = KET_READING[i];
+    var allReadingList = (typeof KET_READING_BATCH2 !== 'undefined') ? KET_READING.concat(KET_READING_BATCH2) : KET_READING;
+    for (var i = 0; i < allReadingList.length; i++) {
+      var test = allReadingList[i];
       var qCount = test.parts.reduce(function(s, p) { return s + p.questions.length; }, 0);
       html += '<div style="padding:10px; border-radius:10px; background:#fff; border:1px solid #e0e0e0; cursor:pointer; font-size:14px;" onclick="App.startReadingTest(' + test.id + ')">📖 ' + test.title + ' · ' + qCount + '题</div>';
     }
@@ -529,22 +690,19 @@ const App = {
 
   // 把6套×3部分=18个Part分配到15天
   getReadingDayTask(day) {
-    // 所有Part列表
+    // 合并第一批和第二批阅读
+    var allReading = (typeof KET_READING_BATCH2 !== 'undefined') ? KET_READING.concat(KET_READING_BATCH2) : KET_READING;
     var allParts = [];
-    for (var i = 0; i < KET_READING.length; i++) {
-      var test = KET_READING[i];
+    for (var i = 0; i < allReading.length; i++) {
+      var test = allReading[i];
       for (var j = 0; j < test.parts.length; j++) {
         allParts.push({ testId: test.id, partIndex: j, part: test.parts[j], testTitle: test.title });
       }
     }
-    // 18个Part分15天：前12天每天1个Part，后3天每天2个Part
-    // 简单方案：每天1个Part，15天做15个Part，剩3个Part作为 bonus
+    // 36个Part分30天，每天1个Part
     var partIdx = (day - 1) % allParts.length;
-    if (partIdx >= 15) partIdx = partIdx % 15; // 安全限制
     var item = allParts[partIdx];
-    if (!item) { // 万一越界，取第一个
-      item = allParts[0];
-    }
+    if (!item) { item = allParts[0]; }
     return {
       title: item.testTitle + ' · ' + item.part.name,
       desc: item.part.instruction,
@@ -556,7 +714,8 @@ const App = {
 
   startReadingDay(day) {
     var task = this.getReadingDayTask(day);
-    var test = KET_READING.find(t => t.id === task.testId);
+    var allReading = (typeof KET_READING_BATCH2 !== 'undefined') ? KET_READING.concat(KET_READING_BATCH2) : KET_READING;
+    var test = allReading.find(t => t.id === task.testId);
     if (!test) return;
     // 只取对应的Part
     var singlePart = test.parts[task.partIndex];
@@ -571,7 +730,8 @@ const App = {
   },
 
   startReadingTest(testId) {
-    const test = KET_READING.find(t => t.id === testId);
+    var allReadingFind = (typeof KET_READING_BATCH2 !== 'undefined') ? KET_READING.concat(KET_READING_BATCH2) : KET_READING;
+    const test = allReadingFind.find(t => t.id === testId);
     if (!test) return;
     this.readingState = { test, userAnswers: {}, correct: 0, total: test.parts.reduce((s, p) => s + p.questions.length, 0), startTime: Date.now() };
     this.renderReadingAll();
@@ -657,7 +817,11 @@ const App = {
         var isCorrect = userAns === correctAns;
         if (isCorrect) correct++;
         total++;
-        Storage.recordAnswer(isCorrect, 'reading');
+        Storage.recordAnswer(isCorrect, 'reading', part.questions[qi].question || ('第' + (qi+1) + '题'), {
+          question: part.questions[qi].question || '',
+          userAnswer: userAns || '',
+          correctAnswer: correctAns || ''
+        });
 
         var container = document.querySelector('.reading-options[data-pidx="' + pi + '"][data-qidx="' + qi + '"]');
         if (container) {
@@ -864,7 +1028,12 @@ const App = {
 
     // 记录答题
     for (var qi2 = 0; qi2 < item.questions.length; qi2++) {
-      Storage.recordAnswer(userAnswers[qi2] === item.questions[qi2].answer, 'listening');
+      var lIsCorrect = userAnswers[qi2] === item.questions[qi2].answer;
+      Storage.recordAnswer(lIsCorrect, 'listening', item.questions[qi2].question || ('第' + (qi2+1) + '题'), {
+        question: item.questions[qi2].question || '',
+        userAnswer: userAnswers[qi2] || '',
+        correctAnswer: item.questions[qi2].answer || ''
+      });
     }
 
     // 显示结果
@@ -1268,7 +1437,6 @@ const App = {
         <p>请输入密码查看学习数据</p>
         <input type="password" class="login-input" id="parent-password" placeholder="请输入密码" autocomplete="off" />
         <button class="btn-primary btn-big" onclick="App.checkParentPassword()">进入</button>
-        <p class="login-hint">默认密码：8888</p>
       </div>
     `;
     setTimeout(() => {
@@ -1299,6 +1467,125 @@ const App = {
   },
 
   showParentPanel() {
+    const el = document.getElementById('view-parent');
+    el.innerHTML = `
+      <div class="parent-login">
+        <div class="login-icon">⏳</div>
+        <h2>正在加载所有学生数据...</h2>
+      </div>
+    `;
+    this._loadAllStudents();
+  },
+
+  async _loadAllStudents() {
+    const FIREBASE_URL = 'https://ket-study-default-rtdb.firebaseio.com';
+    const students = [
+      { id: 'student1', name: '👦 大宝' },
+      { id: 'student2', name: '👧 二宝' }
+    ];
+    
+    // 从Firebase直接拉每个学生的完整数据
+    for (const s of students) {
+      try {
+        const resp = await fetch(FIREBASE_URL + '/students/' + s.id + '.json', { cache: 'no-store' });
+        if (resp.ok) {
+          const data = await resp.json();
+          s.data = data || {};
+        }
+      } catch(e) { console.log('[KET] 加载' + s.id + '数据失败:', e.message); }
+    }
+    this._parentStudentsData = students; // 缓存供历史查看用
+    this._renderParentPanelAll(students);
+  },
+
+  _renderParentPanelAll(students) {
+    const el = document.getElementById('view-parent');
+    let html = '<div class="parent-panel"><div class="parent-header"><h2>👨‍👩‍👦 家长监控面板</h2></div>';
+
+    for (const s of students) {
+      const d = s.data || {};
+      const stats = d.stats || { totalStars: 0, totalCorrect: 0, totalQuestions: 0 };
+      const streak = d.streak || { current: 0, longest: 0 };
+      const sessions = d.sessions || [];
+      const today = new Date().toISOString().split('T')[0];
+      const todaySessions = sessions.filter(ss => ss.date === today);
+      const todayStars = todaySessions.reduce((sum, ss) => sum + (ss.stars || 0), 0);
+      const todayCorrect = todaySessions.reduce((sum, ss) => sum + (ss.correct || 0), 0);
+      const todayTotal = todaySessions.reduce((sum, ss) => sum + (ss.total || 0), 0);
+      const todayAcc = todayTotal > 0 ? Math.round(todayCorrect / todayTotal * 100) : 0;
+      const overallAcc = stats.totalQuestions > 0 ? Math.round(stats.totalCorrect / stats.totalQuestions * 100) : 0;
+      const wordStats = d.wordStats || {};
+      const mastered = Object.values(wordStats).filter(w => w.correct >= 3).length;
+      const mistakes = d.mistakes || [];
+
+      html += `
+        <div class="parent-section" style="border:2px solid #e0f2fe;border-radius:12px;padding:12px;margin:12px 0;">
+          <h3>${s.name} 的学习数据</h3>
+          <div class="parent-stats-grid">
+            <div class="parent-stat">
+              <div class="parent-stat-label">⭐ 总星星</div>
+              <div class="parent-stat-value">${stats.totalStars || 0}</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">🎯 总正确率</div>
+              <div class="parent-stat-value">${overallAcc}%</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">🔥 连续打卡</div>
+              <div class="parent-stat-value">${streak.current || 0}天</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">📚 掌握单词</div>
+              <div class="parent-stat-value">${mastered}/150</div>
+            </div>
+          </div>
+          <div class="parent-stats-grid" style="margin-top:8px;">
+            <div class="parent-stat">
+              <div class="parent-stat-label">✅ 今日完成</div>
+              <div class="parent-stat-value">${new Set(todaySessions.map(ss => ss.module)).size}模块</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">📊 今日正确率</div>
+              <div class="parent-stat-value">${todayAcc}%</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">⭐ 今日星星</div>
+              <div class="parent-stat-value">${todayStars}</div>
+            </div>
+            <div class="parent-stat">
+              <div class="parent-stat-label">❌ 错题数</div>
+              <div class="parent-stat-value">${mistakes.length}</div>
+            </div>
+          </div>
+          ${todaySessions.length > 0 ? `
+            <details style="margin-top:8px;">
+              <summary style="cursor:pointer;color:#2563eb;">📋 今日答题详情</summary>
+              ${todaySessions.map(ss => `
+                <div style="padding:4px 0;border-bottom:1px solid #eee;font-size:14px;">
+                  ${ss.module}: ${ss.correct || 0}/${ss.total || 0} 正确 (${ss.stars || 0}⭐)
+                </div>
+              `).join('')}
+            </details>
+          ` : '<p style="color:#999;font-size:14px;margin-top:8px;">今天还没学习</p>'}
+          ${mistakes.length > 0 ? `
+            <details style="margin-top:8px;">
+              <summary style="cursor:pointer;color:#ef4444;">❌ 最近错题 (${mistakes.length})</summary>
+              ${mistakes.slice(-10).reverse().map(m => `
+                <div style="padding:2px 0;font-size:13px;color:#666;">
+                  ${m.module}: ${m.word || ''} (${m.date})
+                </div>
+              `).join('')}
+            </details>
+          ` : ''}
+          <button class="btn-primary" style="width:100%;margin-top:12px;" onclick="App.showHistoryView('${s.id}', '${s.name}')">📅 查看每日学习历史</button>
+        </div>
+      `;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  },
+
+  _renderParentPanel() {
     const stats = Storage.getStats();
     const streak = Storage.getStreak();
     const wordProgress = Storage.getWordProgress();
@@ -1401,6 +1688,10 @@ const App = {
         </div>
 
         <div class="parent-section">
+          <button class="btn-primary" style="width:100%;" onclick="App.showHistoryView()">📅 查看每日学习历史（按日查看对/错详情）</button>
+        </div>
+
+        <div class="parent-section">
           <h3>📚 词汇掌握详情</h3>
           <div class="word-progress-detail">
             <div class="word-stat-row">
@@ -1436,11 +1727,168 @@ const App = {
     URL.revokeObjectURL(url);
   },
 
+  // 当前查看的历史日期
+  _historyDate: null,
+
   confirmReset() {
     if (confirm('确定要重置所有学习数据吗？此操作不可撤销！')) {
       Storage.resetAll();
       this.showParentLogin();
     }
+  },
+
+  // ============ 每日学习历史 ============
+  showHistoryView(studentId, studentName) {
+    // 家长端：从已加载的学生数据中读取dailyLog
+    // 支持多学生：如果指定了studentId就用对应的，否则默认用student1
+    let dailyLog = {};
+    let displayName = studentName || '';
+    
+    if (this._parentStudentsData) {
+      // 从家长端缓存的学生数据中找
+      const target = studentId 
+        ? this._parentStudentsData.find(s => s.id === studentId)
+        : this._parentStudentsData[0]; // 默认第一个（大宝）
+      if (target && target.data) {
+        dailyLog = target.data.dailyLog || {};
+        displayName = displayName || target.name;
+      }
+    } else {
+      // 学生端fallback：从本地Storage读
+      dailyLog = Storage.get('dailyLog', {});
+    }
+    const dates = Object.keys(dailyLog).sort().reverse();
+    
+    const el = document.getElementById('view-parent');
+    let datesHtml = '';
+    if (dates.length === 0) {
+      datesHtml = '<p style="color:#999;text-align:center;padding:20px;">暂无学习记录</p>';
+    } else {
+      datesHtml = dates.map(d => {
+        const dayLog = dailyLog[d] || [];
+        const correct = dayLog.filter(e => e.correct).length;
+        const total = dayLog.length;
+        const acc = total > 0 ? Math.round(correct / total * 100) : 0;
+        const modules = [...new Set(dayLog.map(e => e.module))];
+        const wrong = total - correct;
+        const dateObj = new Date(d);
+        const weekDay = ['日','一','二','三','四','五','六'][dateObj.getDay()];
+        return `<div class="history-date-item" onclick="App.showHistoryDetail('${d}')" style="padding:12px;margin:8px 0;border-radius:10px;background:#fff;border:1px solid #eee;cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <span style="font-size:16px;font-weight:bold;">📅 ${d}</span>
+              <span style="font-size:13px;color:#999;margin-left:8px;">周${weekDay}</span>
+            </div>
+            <div style="display:flex;gap:12px;font-size:14px;">
+              <span style="color:#52c41a;">✅ ${correct}</span>
+              ${wrong > 0 ? `<span style="color:#ff4d4f;">❌ ${wrong}</span>` : ''}
+              <span style="color:#1890ff;">${acc}%</span>
+            </div>
+          </div>
+          <div style="margin-top:6px;font-size:12px;color:#999;">${modules.join(' · ')} · 共${total}题</div>
+        </div>`;
+      }).join('');
+    }
+    
+    el.innerHTML = `
+      <div class="parent-panel">
+        <div class="parent-header">
+          <h2>📅 每日学习历史 - ${studentName || ''}</h2>
+          <button class="btn-small" onclick="App.showParentLogin()">← 返回</button>
+        </div>
+        <p style="color:#666;font-size:14px;margin-bottom:12px;">点击任意日期查看当天每道题的详细对错记录</p>
+        ${datesHtml}
+      </div>
+    `;
+    el.scrollIntoView({ behavior: 'smooth' });
+  },
+
+  showHistoryDetail(dateStr) {
+    // 家长端从缓存学生数据读取，学生端从Storage读取
+    let dailyLog = {};
+    if (this._parentStudentsData) {
+      const target = this._parentStudentsData[0];
+      dailyLog = (target && target.data && target.data.dailyLog) || {};
+    } else {
+      dailyLog = Storage.get('dailyLog', {});
+    }
+    const log = dailyLog[dateStr] || [];
+    const dateObj = new Date(dateStr);
+    const weekDay = ['日','一','二','三','四','五','六'][dateObj.getDay()];
+    
+    // 按模块分组
+    const moduleGroups = {};
+    log.forEach(e => {
+      if (!moduleGroups[e.module]) moduleGroups[e.module] = [];
+      moduleGroups[e.module].push(e);
+    });
+    
+    const moduleNames = {
+      'words': '📝 单词关卡',
+      'reading': '📖 阅读理解',
+      'listening': '👂 听力练习',
+      'speaking': '🗣️ 口语训练',
+      'authentic_listening': '🎧 真题听力'
+    };
+    
+    let detailHtml = '';
+    Object.keys(moduleGroups).forEach(mod => {
+      const entries = moduleGroups[mod];
+      const correct = entries.filter(e => e.correct).length;
+      const wrong = entries.length - correct;
+      detailHtml += `
+        <div style="margin:12px 0;padding:12px;border-radius:10px;background:#f8fafc;border:1px solid #e8e8e8;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h4 style="margin:0;color:#1890ff;">${moduleNames[mod] || mod}</h4>
+            <span style="font-size:14px;">✅ ${correct} / ❌ ${wrong} (${entries.length}题)</span>
+          </div>
+          <div style="display:grid;gap:4px;">
+            ${entries.map((e, i) => `
+              <div style="padding:8px;border-radius:6px;background:${e.correct ? '#f6ffed' : '#fff2f0'};border:1px solid ${e.correct ? '#b7eb8f' : '#ffccc7'};font-size:13px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <span style="margin-right:6px;">${e.correct ? '✅' : '❌'}</span>
+                    <span style="font-weight:bold;">${e.word || '第' + (i+1) + '题'}</span>
+                  </div>
+                  ${!e.correct && e.correctAnswer ? `<span style="color:#999;font-size:12px;">正确答案: ${e.correctAnswer}</span>` : ''}
+                </div>
+                ${e.question ? `<div style="color:#666;font-size:12px;margin-top:2px;">${e.question}</div>` : ''}
+                ${!e.correct && e.userAnswer ? `<div style="color:#ff4d4f;font-size:12px;">你的答案: ${e.userAnswer}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    });
+    
+    if (!detailHtml) detailHtml = '<p style="color:#999;text-align:center;padding:20px;">当天无学习记录</p>';
+    
+    const correct = log.filter(e => e.correct).length;
+    const total = log.length;
+    const acc = total > 0 ? Math.round(correct / total * 100) : 0;
+    
+    const el = document.getElementById('view-parent');
+    el.innerHTML = `
+      <div class="parent-panel">
+        <div class="parent-header">
+          <h2>📅 ${dateStr} (周${weekDay}) 详情</h2>
+          <button class="btn-small" onclick="App.showHistoryView()">← 返回历史列表</button>
+        </div>
+        <div style="padding:12px;background:#e3f2fd;border-radius:10px;margin-bottom:12px;">
+          <div style="display:flex;gap:20px;font-size:15px;">
+            <span>📊 总共 <b>${total}</b> 题</span>
+            <span style="color:#52c41a;">✅ 答对 <b>${correct}</b></span>
+            <span style="color:#ff4d4f;">❌ 答错 <b>${total - correct}</b></span>
+            <span style="color:#1890ff;">正确率 <b>${acc}%</b></span>
+          </div>
+        </div>
+        ${detailHtml}
+        <div style="text-align:center;margin-top:15px;">
+          <button class="btn-secondary" onclick="App.showHistoryView()">← 返回历史列表</button>
+        </div>
+      </div>
+    `;
+    el.scrollIntoView({ behavior: 'smooth' });
   },
 
   // ============ UTILITIES ============
